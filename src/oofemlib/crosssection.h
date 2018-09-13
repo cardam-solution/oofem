@@ -170,7 +170,8 @@ public:
      * @return True if stiffness matrix of receiver is symmetric.
      */
     virtual bool isCharacteristicMtrxSymmetric(MatResponseMode rMode) { return false; }
-    virtual void printYourself();
+
+    void printYourself() override;
 
     /**
      * Sets up integration rule for the given element.
@@ -263,8 +264,8 @@ public:
      */
     virtual double predictRelativeRedistributionCost(GaussPoint *gp) { return 1.0; }
 
-    virtual IRResultType initializeFrom(InputRecord *ir);
-    virtual void giveInputRecord(DynamicInputRecord &input);
+    IRResultType initializeFrom(InputRecord *ir) override;
+    void giveInputRecord(DynamicInputRecord &input) override;
 
     /**
      * Returns the material associated with the GP.
@@ -277,24 +278,20 @@ public:
      * @param stream Output stream.
      * @param mode Determines amount of info required in stream (state, definition, ...).
      * @param gp integration point.
-     * @return contextIOResultType.
      * @exception throws an ContextIOERR exception if error encountered.
      */
-    virtual contextIOResultType saveIPContext(DataStream &stream, ContextMode mode, GaussPoint *gp);
+    virtual void saveIPContext(DataStream &stream, ContextMode mode, GaussPoint *gp);
     /**
      * Reads integration point state to output stream.
      * @param stream Output stream.
      * @param mode Determines amount of info required in stream (state, definition, ...).
      * @param gp integration point.
-     * @return contextIOResultType.
      * @exception throws an ContextIOERR exception if error encountered.
      */
-    virtual contextIOResultType restoreIPContext(DataStream &stream, ContextMode mode, GaussPoint *gp);
+    virtual void restoreIPContext(DataStream &stream, ContextMode mode, GaussPoint *gp);
 
-    virtual contextIOResultType saveContext(DataStream &stream, ContextMode mode, void *obj = NULL);
-    virtual contextIOResultType restoreContext(DataStream &stream, ContextMode mode, void *obj = NULL);
-
-    
+    void saveContext(DataStream &stream, ContextMode mode) override;
+    void restoreContext(DataStream &stream, ContextMode mode) override;
 };
 } // end namespace oofem
 #endif // crosssection_h

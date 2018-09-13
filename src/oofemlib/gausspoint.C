@@ -47,9 +47,6 @@ GaussPoint :: GaussPoint(IntegrationRule *ir, int n, FloatArray iNaturalCoord, d
     weight(w),
     materialMode(mode)
 {
-    subPatchCoordinates = NULL;
-    globalCoordinates = NULL;
-    materialStatus = NULL;
 }
 
 GaussPoint :: GaussPoint(IntegrationRule * ir, int n, double w, MaterialMode mode) :
@@ -58,47 +55,34 @@ GaussPoint :: GaussPoint(IntegrationRule * ir, int n, double w, MaterialMode mod
     weight(w),
     materialMode(mode)
 {
-    subPatchCoordinates = NULL;
-    globalCoordinates = NULL;
-    materialStatus = NULL;
 }
 
-GaussPoint :: ~GaussPoint()
+GaussPoint::~GaussPoint()
 {
     for ( GaussPoint *gp: gaussPoints ) {
         delete gp;
     }
-
-    delete subPatchCoordinates;
-    delete globalCoordinates;
-    delete materialStatus;
 }
 
 
-void GaussPoint :: printOutputAt(FILE *File, TimeStep *tStep)
-// Prints the strains and stresses on the data file.
+void GaussPoint :: printOutputAt(FILE *file, TimeStep *tStep)
 {
-    int iruleNumber = 0;
+    int iruleNumber = irule ? irule->giveNumber() : 0;
 
-    if ( irule ) {
-        iruleNumber = irule->giveNumber();
-    }
+    fprintf(file, "  GP %2d.%-2d :", iruleNumber, number);
 
-    fprintf(File, "  GP %2d.%-2d :", iruleNumber, number);
-
-    // invoke printOutputAt method for all managed statuses
     IntegrationPointStatus *status = this->giveMaterialStatus();
     if ( status ) {
-        status->printOutputAt(File, tStep);
+        status->printOutputAt(file, tStep);
     }
 
     if ( gaussPoints.size() != 0 ) { // layered material
-        fprintf(File, "Layers report \n{\n");
-        for ( GaussPoint *gp: gaussPoints ) {
-            gp->printOutputAt(File, tStep);
+        fprintf(file, "Layers report \n{\n");
+        for ( auto &gp: gaussPoints ) {
+            gp->printOutputAt(file, tStep);
         }
 
-        fprintf(File, "} end layers report\n");
+        fprintf(file, "} end layers report\n");
     }
 }
 
@@ -111,7 +95,7 @@ GaussPoint *GaussPoint :: giveSlaveGaussPoint(int index)
 //
 {
     if ( gaussPoints.size() == 0 ) {
-        return NULL;
+        return nullptr;
     }
 
     if ( ( index < 0 ) || ( index >= (int)gaussPoints.size() ) ) {
@@ -121,16 +105,17 @@ GaussPoint *GaussPoint :: giveSlaveGaussPoint(int index)
     return gaussPoints [ index ];
 }
 
-bool GaussPoint :: hasSlaveGaussPoint() {
+bool GaussPoint :: hasSlaveGaussPoint()
+{
     if ( this->gaussPoints.size() != 0 ) {// layered material
         return true;
     }
     return false;
 }
 
-size_t GaussPoint :: findFirstIndexOfSlaveGaussPoint(GaussPoint *gp) {
-    std::vector< GaussPoint * >::iterator it;
-    it = find( gaussPoints.begin(), gaussPoints.end(), gp );
+size_t GaussPoint :: findFirstIndexOfSlaveGaussPoint(GaussPoint *gp)
+{
+    auto it = find( gaussPoints.begin(), gaussPoints.end(), gp );
     if ( it != gaussPoints.end() ) {
         return it - gaussPoints.begin();
     } else {
@@ -139,58 +124,15 @@ size_t GaussPoint :: findFirstIndexOfSlaveGaussPoint(GaussPoint *gp) {
 }
 
 void GaussPoint :: updateYourself(TimeStep *tStep)
-// Performs end-of-step updates.
 {
     IntegrationPointStatus *status = this->giveMaterialStatus();
     if ( status ) {
         status->updateYourself(tStep);
     }
 
-    for ( GaussPoint *gp: gaussPoints ) {
+    for ( auto &gp: gaussPoints ) {
         gp->updateYourself(tStep);
     }
 }
 
-
-
-/*
- * contextIOResultType
- * GaussPoint :: saveContext (FILE* stream, void *obj)
- * //
- * // saves full gp context (saves state variables, that completely describe
- * // current state)
- * // does not saves the slave - records
- * // this task is done at the layeredCrossSection level
- * {
- *
- * contextIOResultType iores;
- *
- * if ((iores = this->giveMaterial()->saveContext(stream,(void*) this)) != CIO_OK) THROW_CIOERR(iores);
- * // if (matStatusDict->saveContext(stream,obj) != 1)
- * //   error ("saveContext io error encountered");
- *
- * return CIO_OK;
- *
- * }
- *
- *
- * contextIOResultType
- * GaussPoint :: restoreContext (FILE* stream, void *obj)
- * //
- * // restores full material context (saves state variables, that completely describe
- * // current state)
- * // does not restores the slave - records
- * // this task is done at the layeredCrossSection level
- * //
- * {
- *
- * contextIOResultType iores;
- * if ((iores = this->giveMaterial()->restoreContext(stream,(void*) this)) != CIO_OK) THROW_CIOERR(iores);
- * //if (matStatusDict->restoreContext(stream,obj) != 1)
- * //  error ("restoreContext io error encountered");
- *
- * return CIO_OK;
- *
- * }
- */
 } // end namespace oofem

@@ -148,7 +148,7 @@ MazarsNLMaterial :: computeWeightFunction(const FloatArray &src, const FloatArra
 {
     // Bell shaped function decaying with the distance.
 
-    double dist = src.distance(coord);
+    double dist = distance(src, coord);
 
     if ( ( dist >= 0. ) && ( dist <= this->R ) ) {
         double help = ( 1. - dist * dist / ( R * R ) );
@@ -222,40 +222,18 @@ MazarsNLMaterialStatus :: updateYourself(TimeStep *tStep)
 }
 
 
-contextIOResultType
-MazarsNLMaterialStatus :: saveContext(DataStream &stream, ContextMode mode, void *obj)
-//
-// saves full information stored in this Status
-// no temp variables stored
-//
+void
+MazarsNLMaterialStatus :: saveContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    // save parent class status
-    if ( ( iores = MazarsMaterialStatus :: saveContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
+    MazarsMaterialStatus :: saveContext(stream, mode);
     //if (!stream.write(&localEquivalentStrainForAverage,1)) THROW_CIOERR(CIO_IOERR);
-    return CIO_OK;
 }
 
-contextIOResultType
-MazarsNLMaterialStatus :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
-//
-// restores full information stored in stream to this Status
-//
+void
+MazarsNLMaterialStatus :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-    // read parent class status
-    if ( ( iores = MazarsMaterialStatus :: restoreContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    // read raw data
+    MazarsMaterialStatus :: restoreContext(stream, mode);
     //if (!stream.read (&localEquivalentStrainForAverage,1)) THROW_CIOERR(CIO_IOERR);
-
-    return CIO_OK;
 }
 
 Interface *

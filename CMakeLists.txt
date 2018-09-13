@@ -472,6 +472,10 @@ endif ()
 if (USE_PYTHON_BINDINGS OR USE_PYTHON)
     # PythonLibs in cmake is bugged, have to try and rely on PythonInterp to get the suitable major and minor versions.
     #set (CMAKE_LIBRARY_DIR ${PYTHON_DIR})
+    #Print if set up manually
+    message(STATUS "PYTHON_LIBRARY = ${PYTHON_LIBRARY}")
+    message(STATUS "PYTHON_EXECUTABLE = ${PYTHON_EXECUTABLE}")
+    message(STATUS "PYTHON_INCLUDE_DIR = ${PYTHON_INCLUDE_DIR}")     
     find_package(PythonInterp "3" REQUIRED)
     find_package(PythonLibs "${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}" REQUIRED)
     include_directories (${PYTHON_INCLUDE_DIRS})
@@ -597,10 +601,14 @@ if (USE_OOFEG)
     install(TARGETS oofeg DESTINATION bin)
 endif ()
 
+add_executable(liboofem_benchmark ${oofem_SOURCE_DIR}/src/main/benchmark.C)
+set_target_properties(liboofem_benchmark PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_link_libraries (liboofem_benchmark liboofem benchmark)
+
 # Example of using liboofem with dynamic input record:
-add_executable(beam01 ${oofem_SOURCE_DIR}/bindings/oofemlib/beam01.C)
-set_target_properties(beam01 PROPERTIES EXCLUDE_FROM_ALL TRUE)
-target_link_libraries (beam01 liboofem)
+add_executable(beam2d_1 ${oofem_SOURCE_DIR}/bindings/oofemlib/beam2d_1.C)
+set_target_properties(beam2d_1 PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_link_libraries (beam2d_1 liboofem)
 
 add_executable(hexgrid ${oofem_SOURCE_DIR}/bindings/oofemlib/hexgrid.C)
 set_target_properties(hexgrid PROPERTIES EXCLUDE_FROM_ALL TRUE)
@@ -785,8 +793,8 @@ if (USE_FM AND USE_SM AND USE_PFEM)
     foreach (case ${fmpfem_benchmark})
         add_test (NAME "benchmark_fm_${case}" WORKING_DIRECTORY ${oofem_BENCHMARK_DIR}/fmpfem COMMAND ${oofem_cmd} "-f" ${case})
     endforeach (case)
-endif()   
-  
+endif()
+
 # Custom targets for test and benchmarks (which can conveniently be accessed from IDEs)
 
 ProcessorCount(N)

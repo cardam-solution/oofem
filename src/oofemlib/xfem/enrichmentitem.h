@@ -41,6 +41,7 @@
 #include "intarray.h"
 #include "dofmanager.h"
 #include "xfem/enrichmentfronts/enrichmentfront.h"
+#include "xfem/enrichmentfunction.h"
 #include "error.h"
 
 #include <vector>
@@ -110,7 +111,8 @@ public:
     EnrichmentItem(int n, XfemManager *xm, Domain *aDomain);
     virtual ~EnrichmentItem();
 
-    virtual IRResultType initializeFrom(InputRecord *ir);
+    IRResultType initializeFrom(InputRecord *ir) override;
+    virtual int instanciateYourself(DataReader &dr) = 0;
 
     /**
      * Note the special treatment here, the "normal" syntax
@@ -120,11 +122,10 @@ public:
      * EnrichmentDomain, EnrichmentFront and PropagationLaw
      * without have to keep track of them globally.
      */
-    virtual void giveInputRecord(DynamicInputRecord &input) { OOFEM_ERROR("This function must be called with DynamicDataReader as input."); }
+    void giveInputRecord(DynamicInputRecord &input) override
+    { OOFEM_ERROR("This function must be called with DynamicDataReader as input."); }
     virtual void appendInputRecords(DynamicDataReader &oDR) = 0;
 
-    virtual int instanciateYourself(DataReader &dr) = 0;
-    virtual const char *giveClassName() const = 0;
     const IntArray *giveEnrichesDofsWithIdArray() const { return & mpEnrichesDofsWithIdArray; }
     int giveNumberOfEnrDofs() const;
 
@@ -151,7 +152,6 @@ public:
 
     virtual bool hasPropagatingFronts() const;
     virtual bool hasInitiationCriteria() { return false; }
-
 
 
     int giveStartOfDofIdPool() const { return this->startOfDofIdPool; }
@@ -215,8 +215,8 @@ public:
     static double calcXiZeroLevel(const double &iQ1, const double &iQ2);
     static void calcPolarCoord(double &oR, double &oTheta, const FloatArray &iOrigin, const FloatArray &iPos, const FloatArray &iN, const FloatArray &iT, const EfInput &iEfInput, bool iFlipTangent);
 
-    PropagationLaw *givePropagationLaw() { return this->mpPropagationLaw; }
-    void setPropagationLaw(PropagationLaw *ipPropagationLaw);
+    PropagationLaw *givePropagationLaw() { return this->mpPropagationLaw.get(); }
+    void setPropagationLaw(std::unique_ptr<PropagationLaw> ipPropagationLaw);
     bool hasPropagationLaw() { return this->mPropLawIndex != 0; }
 
 
@@ -227,26 +227,26 @@ public:
 
     virtual void giveBoundingSphere(FloatArray &oCenter, double &oRadius) = 0;
 
-    EnrichmentFront *giveEnrichmentFrontStart() { return mpEnrichmentFrontStart; }
-    void setEnrichmentFrontStart(EnrichmentFront *ipEnrichmentFrontStart, bool iDeleteOld = true);
+    EnrichmentFront *giveEnrichmentFrontStart() { return mpEnrichmentFrontStart.get(); }
+    void setEnrichmentFrontStart(std::unique_ptr<EnrichmentFront> ipEnrichmentFrontStart, bool iDeleteOld = true);
 
-    EnrichmentFront *giveEnrichmentFrontEnd() { return mpEnrichmentFrontEnd; }
-    void setEnrichmentFrontEnd(EnrichmentFront *ipEnrichmentFrontEnd, bool iDeleteOld = true);
+    EnrichmentFront *giveEnrichmentFrontEnd() { return mpEnrichmentFrontEnd.get(); }
+    void setEnrichmentFrontEnd(std::unique_ptr<EnrichmentFront> ipEnrichmentFrontEnd, bool iDeleteOld = true);
 
     bool tipIsTouchingEI(const TipInfo &iTipInfo);
 
-    void setEnrichmentFunction(EnrichmentFunction *ipEnrichmentFunc) {mpEnrichmentFunc = ipEnrichmentFunc;}
+    void setEnrichmentFunction(std::unique_ptr<EnrichmentFunction> ipEnrichmentFunc) { mpEnrichmentFunc = std::move(ipEnrichmentFunc); }
 
 protected:
 
-    EnrichmentFunction *mpEnrichmentFunc;
+    std::unique_ptr<EnrichmentFunction> mpEnrichmentFunc;
 
-    EnrichmentFront *mpEnrichmentFrontStart, *mpEnrichmentFrontEnd;
+    std::unique_ptr<EnrichmentFront> mpEnrichmentFrontStart, mpEnrichmentFrontEnd;
 
     /// mEnrFrontIndex: nonzero if an enrichment front is present, zero otherwise.
     int mEnrFrontIndex;
 
-    PropagationLaw *mpPropagationLaw;
+    std::unique_ptr<PropagationLaw> mpPropagationLaw;
 
     /// mPropLawIndex: nonzero if a propagation law is present, zero otherwise.
     int mPropLawIndex;

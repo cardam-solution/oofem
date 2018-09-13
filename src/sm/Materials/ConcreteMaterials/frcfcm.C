@@ -800,7 +800,7 @@ double
 FRCFCM :: computeD2ModulusForCrack(GaussPoint *gp, int icrack)
 {
     double cos_theta = 0.5; // to reduce Vf for SRF to one half
-    double E = this->giveLinearElasticMaterial()->giveYoungsModulus();
+    double E = linearElasticMaterial.giveYoungsModulus();
     FRCFCMStatus *status = static_cast< FRCFCMStatus * >( this->giveStatus(gp) );
     double crackStrain;
     double D2m, D2f;
@@ -834,7 +834,7 @@ double
 FRCFCM :: estimateD2ModulusForCrack(GaussPoint *gp, int icrack)
 {
     double cos_theta = 0.5; // to reduce Vf for SRF to one half
-    double E = this->giveLinearElasticMaterial()->giveYoungsModulus();
+    double E = linearElasticMaterial.giveYoungsModulus();
     FRCFCMStatus *status = static_cast< FRCFCMStatus * >( this->giveStatus(gp) );
     double crackStrain;
     double D2m, D2f;
@@ -917,7 +917,7 @@ FRCFCM :: maxShearStress(GaussPoint *gp, int shearDirection)
 {
     double maxTau_m;
     double minTau_f;
-    double E = this->giveLinearElasticMaterial()->giveYoungsModulus();
+    double E = linearElasticMaterial.giveYoungsModulus();
     double crackStrain;
     double gamma_cr;
     double omega;
@@ -1017,7 +1017,7 @@ FRCFCM :: isStrengthExceeded(const FloatMatrix &base, GaussPoint *gp, TimeStep *
         return false;
     }
 
-    Em = this->giveLinearElasticMaterial()->giveYoungsModulus();
+    Em = linearElasticMaterial.giveYoungsModulus();
 
     // matrix is stiffer -> carries higher stress
     if ( ( this->Ef <= Em ) && ( trialStress > this->giveTensileStrength(gp) ) ) {
@@ -1071,10 +1071,11 @@ FRCFCM :: giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type
 
 // computes overall stiffness of the composite material: the main purpose of this method is to adjust the stiffness given by the linear elastic material which corresponds to the matrix. The same method is used by all fiber types.
 double
-FRCFCM :: computeOverallElasticStiffness(void) {
+FRCFCM :: computeOverallElasticStiffness(void)
+{
     double stiffness = 0.;
 
-    double Em = this->giveLinearElasticMaterial()->giveYoungsModulus();
+    double Em = linearElasticMaterial.giveYoungsModulus();
 
     if ( this->fiberType == FT_CAF ) { // continuous aligned fibers
         stiffness = this->Vf * this->Ef + ( 1. - this->Vf ) * Em;
@@ -1096,10 +1097,10 @@ FRCFCM :: computeOverallElasticStiffness(void) {
 
 
 FRCFCMStatus :: FRCFCMStatus(int n, Domain *d, GaussPoint *gp) :
-    ConcreteFCMStatus(n, d, gp)
-{
-    damage = tempDamage = 0.0;
-}
+    ConcreteFCMStatus(n, d, gp),
+    damage(0.),
+    tempDamage(0.)
+{ }
 
 
 FRCFCMStatus :: ~FRCFCMStatus()
@@ -1152,44 +1153,23 @@ FRCFCMStatus :: updateYourself(TimeStep *tStep)
 
 
 
-contextIOResultType
-FRCFCMStatus :: saveContext(DataStream &stream, ContextMode mode, void *obj)
-//
-// saves full information stored in this Status
-// no temp variables stored
-//
+void
+FRCFCMStatus :: saveContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    // save parent class status
-    if ( ( iores = ConcreteFCMStatus :: saveContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
+    ConcreteFCMStatus :: saveContext(stream, mode);
 
     if ( !stream.write(damage) ) {
         THROW_CIOERR(CIO_IOERR);
     }
-
-    return CIO_OK;
 }
 
-contextIOResultType
-FRCFCMStatus :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
-//
-// restores full information stored in stream to this Status
-//
+void
+FRCFCMStatus :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    // read parent class status
-    if ( ( iores = ConcreteFCMStatus :: restoreContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
+    ConcreteFCMStatus :: restoreContext(stream, mode);
 
     if ( !stream.read(damage) ) {
-        return CIO_IOERR;
+        THROW_CIOERR(CIO_IOERR);
     }
-
-    return CIO_OK; // return succes
 }
 } // end namespace oofem

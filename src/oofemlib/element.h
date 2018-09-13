@@ -556,31 +556,29 @@ public:
      * @param bNodes list of boundary edge nodes 
      * @param boundary edge id
      */
-    virtual void giveBoundaryEdgeNodes (IntArray& bNodes, int boundary);
+    virtual void giveBoundaryEdgeNodes(IntArray& bNodes, int boundary);
     /**
      * Returns list of receiver boundary nodes for given surface
      * @param bNodes list of boundary surface nodes 
      * @param boundary surface id
      */
-    virtual void giveBoundarySurfaceNodes (IntArray& bNodes, int boundary);
+    virtual void giveBoundarySurfaceNodes(IntArray& bNodes, int boundary);
     /**
      * Returns boundary edge integration rule
      * @param order approximation order to integrate 
      * @param boundary boundary edge id
-     * @note some elements may increase the order (like axusymmetric elements)
+     * @note some elements may increase the order (like axisymmetric elements)
      */
-    virtual IntegrationRule* giveBoundaryEdgeIntegrationRule (int order, int boundary);
+    virtual std::unique_ptr<IntegrationRule> giveBoundaryEdgeIntegrationRule(int order, int boundary);
     /**
      * Returns boundary surface integration rule
      * @param order approximation order to integrate 
      * @param boundary boundary surface id
-     * @note some elements may increase the order (like axusymmetric elements)
+     * @note some elements may increase the order (like axisymmetric elements)
       */
-    virtual IntegrationRule* giveBoundarySurfaceIntegrationRule (int order, int boundary);
+    virtual std::unique_ptr<IntegrationRule> giveBoundarySurfaceIntegrationRule(int order, int boundary);
 
 
-
-    
     // data management
     /**
      * Translates local to global indices for dof managers.
@@ -760,7 +758,7 @@ public:
      * this is invoked after all domain components are instanciated.
      * @return Zero value if check fail, otherwise nonzero.
      */
-    virtual int checkConsistency() { return 1; }
+    int checkConsistency() override { return 1; }
 
     /**
      * @return True, if receiver is activated for given solution step, otherwise false.
@@ -986,7 +984,7 @@ public:
      * to return an updated number of specified entity type based on old number.
      * @param f Decides the renumbering.
      */
-    virtual void updateLocalNumbering(EntityRenumberingFunctor &f);
+    void updateLocalNumbering(EntityRenumberingFunctor &f) override;
 
     /// Integration point evaluator, loops over receiver IP's and calls given function (passed as f parameter) on them. The IP is parameter to function f.
     template< class T > void ipEvaluator( T *src, void ( T :: *f )( GaussPoint *gp ) );
@@ -1139,12 +1137,13 @@ public:
     IntArray *giveBoundaryLoadArray();
 
     // Overloaded methods:
-    virtual IRResultType initializeFrom(InputRecord *ir);
-    virtual void giveInputRecord(DynamicInputRecord &input);
-    virtual contextIOResultType saveContext(DataStream &stream, ContextMode mode, void *obj = NULL);
-    virtual contextIOResultType restoreContext(DataStream &stream, ContextMode mode, void *obj = NULL);
-    virtual void printOutputAt(FILE *file, TimeStep *tStep);
-    virtual const char *giveClassName() const { return "Element"; }
+    IRResultType initializeFrom(InputRecord *ir) override;
+    void giveInputRecord(DynamicInputRecord &input) override;
+    void saveContext(DataStream &stream, ContextMode mode) override;
+    void restoreContext(DataStream &stream, ContextMode mode) override;
+    const char *giveClassName() const override { return "Element"; }
+
+    void printOutputAt(FILE *file, TimeStep *tStep) override;
 
 protected:
     /**

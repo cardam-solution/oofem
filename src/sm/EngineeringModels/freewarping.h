@@ -81,15 +81,15 @@ protected:
     int initFlag; // needed?
 
 public:
-    FreeWarping(int i, EngngModel *_master = NULL);
+    FreeWarping(int i, EngngModel *master = nullptr);
     virtual ~FreeWarping();
 
     void solveYourself() override;
     void solveYourselfAt(TimeStep *tStep) override;
 
     double giveUnknownComponent(ValueModeType type, TimeStep *tStep, Domain *d, Dof *dof) override;
-    //contextIOResultType saveContext(DataStream &stream, ContextMode mode, void *obj = NULL) override;
-    //contextIOResultType restoreContext(DataStream &stream, ContextMode mode, void *obj = NULL) override;
+    //void saveContext(DataStream &stream, ContextMode mode) override;
+    //void restoreContext(DataStream &stream, ContextMode mode) override;
 
     void updateDomainLinks() override;
 

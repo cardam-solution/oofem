@@ -39,6 +39,8 @@
 #include "dictionary.h"
 #include "floatarray.h"
 #include "floatmatrix.h"
+#include "floatmatrixf.h"
+#include "floatarrayf.h"
 
 #include "qcmaterialextensioninterface.h"
 
@@ -71,11 +73,13 @@ class GaussPoint;
 {
 protected:
     /// Young's modulus.
-    double E;
+    double E = 0;
     /// Poisson's ratio.
-    double nu;
+    double nu = 0;
     /// Shear modulus.
-    double G;
+    double G = 0;
+    /// Alpha
+    double a = 0;
 
 public:
     /**
@@ -84,7 +88,7 @@ public:
      * @param n material model number in domain
      * @param d domain which receiver belongs to
      */
-    IsotropicLinearElasticMaterial(int n, Domain *d) : LinearElasticMaterial(n, d) { }
+    IsotropicLinearElasticMaterial(int n, Domain *d);
     /**
      * Creates a new IsotropicLinearElasticMaterial class instance
      * with given number belonging to domain d.
@@ -97,28 +101,25 @@ public:
     /// Destructor.
     virtual ~IsotropicLinearElasticMaterial() { }
 
-    /**
-     * Returns a vector of coefficients of thermal dilatation in direction
-     * of each material principal (local) axis.
-     * @param answer Vector of thermal dilatation coefficients.
-     * @param gp Integration point.
-     * @param tStep Time step (most models are able to respond only when tStep is current time step).
-     */
-    virtual void giveThermalDilatationVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep);
-
-    // identification and auxiliary functions
-    virtual const char *giveClassName() const { return "IsotropicLinearElasticMaterial"; }
-    virtual const char *giveInputRecordName() const { return _IFT_IsotropicLinearElasticMaterial_Name; }
+    const char *giveClassName() const override { return "IsotropicLinearElasticMaterial"; }
+    const char *giveInputRecordName() const override { return _IFT_IsotropicLinearElasticMaterial_Name; }
 
     /**
      * Initializes receiver according to object description stored in input record.
      * The E modulus (keyword "E"), Poisson ratio ("nu") and coefficient of thermal dilatation
      * alpha ("talpha") are read. The parent class instanciateFrom method is called.
      */
-    virtual IRResultType initializeFrom(InputRecord *ir);
-    virtual void giveInputRecord(DynamicInputRecord &input);
+    IRResultType initializeFrom(InputRecord *ir) override;
+    void giveInputRecord(DynamicInputRecord &input) override;
 
-    virtual double give(int aProperty, GaussPoint *gp);
+    void saveContext(DataStream &stream, ContextMode mode) override;
+    void restoreContext(DataStream &stream, ContextMode mode) override;
+
+    /// Initialized fixed size tangents. Called by ctor and initializeFrom.
+    void initTangents();
+    FloatMatrixF<3,3> foo() { return this->tangentPlaneStress; }
+
+    double give(int aProperty, GaussPoint *gp) override;
 
     /// Returns Young's modulus.
     double giveYoungsModulus() { return E; }
@@ -127,27 +128,22 @@ public:
     double givePoissonsRatio() { return nu; }
 
     /// Returns the shear elastic modulus @f$ G = \frac{E}{2(1+\nu)} @f$.
-    double giveShearModulus() { return G; }
+    double giveShearModulus() override { return G; }
 
     /// Returns the bulk elastic modulus @f$ K = \frac{E}{3(1-2\nu)} @f$.
     double giveBulkModulus() { return E / ( 3. * ( 1. - 2. * nu ) ); }
 
-    virtual void give3dMaterialStiffnessMatrix(FloatMatrix & answer,
-                                               MatResponseMode,
-                                               GaussPoint * gp,
-                                               TimeStep * tStep);
+    void givePlaneStressStiffMtrx(FloatMatrix & answer,
+                                  MatResponseMode, GaussPoint * gp,
+                                  TimeStep * tStep) override;
 
-    virtual void givePlaneStressStiffMtrx(FloatMatrix & answer,
-                                          MatResponseMode, GaussPoint * gp,
-                                          TimeStep * tStep);
+    void givePlaneStrainStiffMtrx(FloatMatrix & answer,
+                                  MatResponseMode, GaussPoint * gp,
+                                  TimeStep * tStep) override;
 
-    virtual void givePlaneStrainStiffMtrx(FloatMatrix & answer,
-                                          MatResponseMode, GaussPoint * gp,
-                                          TimeStep * tStep);
-
-    virtual void give1dStressStiffMtrx(FloatMatrix & answer,
-                                       MatResponseMode, GaussPoint * gp,
-                                       TimeStep * tStep);
+    void give1dStressStiffMtrx(FloatMatrix & answer,
+                               MatResponseMode, GaussPoint * gp,
+                               TimeStep * tStep) override;
 
     /**
      * Computes bulk modulus from given Young's modulus and Poisson's ratio.
@@ -171,20 +167,17 @@ public:
         return young / ( 2. * ( 1. + nu ) );
     }
 
+    double giveQcElasticParamneter() override { return E; }
+    double giveQcPlasticParamneter() override { return std::numeric_limits<float>::infinity(); }
 
-    virtual  double giveQcElasticParamneter(){return E;}
-    virtual  double giveQcPlasticParamneter(){return std::numeric_limits<float>::infinity();}
-
-    virtual Interface *giveInterface(InterfaceType t) {
+    Interface *giveInterface(InterfaceType t) override {
         if ( t == QCMaterialExtensionInterfaceType ) {
-	    //            return static_cast< QCMaterialExtensionInterface * >(this);
-	    return this;
+            //            return static_cast< QCMaterialExtensionInterface * >(this);
+            return this;
         } else {
-            return NULL;
+            return nullptr;
         }
     }
-
-    
 };
 } // end namespace oofem
 #endif // isolinearelasticmaterial_h

@@ -75,7 +75,7 @@ protected:
       coords = v.coords;
       return *this;
     }
-    const FloatArray* getCoordinates() const {return &coords;}
+    const FloatArray& getCoordinates() const { return coords; }
   };
 
 
@@ -112,10 +112,10 @@ protected:
         this->cell = c;
       }
       virtual ~FEICellGeometryWrapper() { }
-      int giveNumberOfVertices() const {
+      int giveNumberOfVertices() const override {
         return this->cell->giveNumberOfVertices();
       }
-      inline const FloatArray *giveVertexCoordinates(int i) const
+      const FloatArray &giveVertexCoordinates(int i) const override
       {
         return ((cell->getVertex(i-1))->getCoordinates());
       }
@@ -154,12 +154,12 @@ protected:
     void giveBoundingBox(BoundingBox& bb) const  {
       double size;
       FloatArray bb0, bb1;
-      bb1 = bb0 = *(this->getVertex(0)->getCoordinates());
+      bb1 = bb0 = this->getVertex(0)->getCoordinates();
 
       for ( int i = 1; i < this->giveNumberOfVertices(); ++i ) {
-        const FloatArray *coordinates = this->getVertex(i)->getCoordinates();
-        bb0.beMinOf(bb0, * coordinates);
-        bb1.beMaxOf(bb1, * coordinates);
+        const auto &coordinates = this->getVertex(i)->getCoordinates();
+        bb0.beMinOf(bb0, coordinates);
+        bb1.beMaxOf(bb1, coordinates);
       }
       bb1.subtract(bb0);
       int nsd = bb1.giveSize();
@@ -175,7 +175,7 @@ protected:
 
       if ( !interp->global2local( lcoords, gcoords, FEICellGeometryWrapper(this) ) ) { // Outside element
         interp->local2global( closest, lcoords, FEICellGeometryWrapper(this) );
-        return closest.distance(gcoords);
+        return distance(closest, gcoords);
       } else {
         closest = gcoords;
         return 0.0;
@@ -226,7 +226,7 @@ protected:
   private:
   public:
     CellInsertionFunctor () {}
-    virtual bool evaluate (Cell& member, OctantRecT<Cell>* cell) {
+    virtual bool evaluate (Cell& member, OctantRecT<Cell>* cell) override {
       BoundingBox b;
       member.giveBoundingBox(b);
       OctantRec::BoundingBoxStatus s = cell->testBoundingBox(b);
@@ -237,8 +237,8 @@ protected:
       }
     }
     
-    void registerInsertion (Cell& member, LocalInsertionData<Cell> lidata) {}
-    std::list<LocalInsertionData<Cell>> *giveInsertionList(Cell& m) {return NULL;}
+    void registerInsertion (Cell& member, LocalInsertionData<Cell> lidata) override {}
+    std::list<LocalInsertionData<Cell>> *giveInsertionList(Cell& m) override {return nullptr;}
     
   };
   
@@ -261,7 +261,7 @@ protected:
      * @param DTptr Delaunay triangle. nodeNr Number of the node in the domain list
      * @returns true if the circumscribed circle of the Delaunay triangle contains the point, false otherwise
      */
-    bool evaluate(Cell& c)
+    bool evaluate(Cell& c) override
     {
       if (c.containsPoint(position)) {
         cells.push_back(c);
@@ -275,7 +275,7 @@ protected:
      * Gives the starting position of the search
      * @param position startingPosition
      */
-    void giveStartingPosition(FloatArray &answer)
+    void giveStartingPosition(FloatArray &answer) override
     {
         answer = position;
     }
@@ -284,11 +284,11 @@ protected:
      * Gives the triangles containing the node
      * @param answer List containing Delaunay triangles
      */
-    void giveResult(std :: list <Cell > &answer)
+    void giveResult(std :: list <Cell > &answer) override
     { answer=cells;}
 
-    bool isBBXStage1Defined(BoundingBox &BBXStage1) { return true; }
-    bool isBBXStage2Defined(BoundingBox &BBXStage2) { return false; }
+    bool isBBXStage1Defined(BoundingBox &BBXStage1) override { return true; }
+    bool isBBXStage2Defined(BoundingBox &BBXStage2) override { return false; }
 
   };
  
@@ -366,8 +366,8 @@ protected:
             
             int idOfClosestPoint=-1;
             for(int i=0;i<(int) this->vertexList.size();i++){
-                const FloatArray *pcoords=this->vertexList[i].getCoordinates();
-                dist=sqrt( pow(coords[0]-pcoords->at(1),2)+pow(coords[1]-pcoords->at(2),2)+pow(coords[2]-pcoords->at(3),2) );
+                const auto &pcoords = this->vertexList[i].getCoordinates();
+                dist=sqrt( pow(coords[0]-pcoords.at(1),2)+pow(coords[1]-pcoords.at(2),2)+pow(coords[2]-pcoords.at(3),2) );
                 if((dist<minDist) || (!i)){
                     minDist=dist;
                     idOfClosestPoint=i;
@@ -405,14 +405,14 @@ protected:
       // get octree bbox
       std::vector<Vertex>::iterator it = vertexList.begin();
       FloatArray cmax, cmin;
-      cmax= cmin = *((*it).getCoordinates());
+      cmax = cmin = (*it).getCoordinates();
       int nsd  = cmin.giveSize();
       ++it;
       for (; it != vertexList.end(); ++it) {
-        const FloatArray *vc = (*it).getCoordinates();
+          const auto &vc = (*it).getCoordinates();
         for (int j=0; j<nsd; j++)  {
-          cmax(j)=max(cmax(j), (*vc)(j));
-          cmin(j)=min(cmin(j), (*vc)(j));
+          cmax(j)=max(cmax(j), vc(j));
+          cmin(j)=min(cmin(j), vc(j));
         }
       }
       // introduce origin shift (if set up)

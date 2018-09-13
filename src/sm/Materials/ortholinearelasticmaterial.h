@@ -42,6 +42,8 @@
 #include "matconst.h"
 #include "element.h"
 
+#include <memory>
+
 ///@name Input fields for OrthotropicLinearElasticMaterial
 //@{
 #define _IFT_OrthotropicLinearElasticMaterial_Name "orthole"
@@ -101,48 +103,30 @@ class OrthotropicLinearElasticMaterial : public LinearElasticMaterial
 {
 protected:
     CS_type cs_type;
-    FloatMatrix *localCoordinateSystem;
-    FloatArray *helpPlaneNormal;
+    std::unique_ptr<FloatMatrix> localCoordinateSystem;
+    std::unique_ptr<FloatArray> helpPlaneNormal;
     // in localCoordinateSystem the unity vectors are stored
     // COLUMWISE (this is exception, but allows faster numerical
     // implementation)
 
 public:
 
-    OrthotropicLinearElasticMaterial(int n, Domain * d) : LinearElasticMaterial(n, d)
-    {
-        localCoordinateSystem = NULL;
-        helpPlaneNormal = NULL;
-        cs_type = unknownCS;
-    }
-    virtual ~OrthotropicLinearElasticMaterial()
-    {
-        if ( localCoordinateSystem ) {
-            delete localCoordinateSystem;
-        }
+    OrthotropicLinearElasticMaterial(int n, Domain * d) : LinearElasticMaterial(n, d),
+        cs_type(unknownCS)
+    { }
+    virtual ~OrthotropicLinearElasticMaterial() { }
 
-        if ( helpPlaneNormal ) {
-            delete helpPlaneNormal;
-        }
-    }
+    void giveThermalDilatationVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep) override;
 
-    virtual void giveThermalDilatationVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep);
+    const char *giveInputRecordName() const override { return _IFT_OrthotropicLinearElasticMaterial_Name; }
+    const char *giveClassName() const override { return "OrthotropicLinearElasticMaterial"; }
+    IRResultType initializeFrom(InputRecord *ir) override;
+    void giveInputRecord(DynamicInputRecord &input) override;
+    double give(int aProperty, GaussPoint *gp) override;
 
-    // identification and auxiliary functions
-    virtual const char *giveInputRecordName() const { return _IFT_OrthotropicLinearElasticMaterial_Name; }
-    virtual const char *giveClassName() const { return "OrthotropicLinearElasticMaterial"; }
-    virtual IRResultType initializeFrom(InputRecord *ir);
-    void giveInputRecord(DynamicInputRecord &input);
-    virtual double give(int aProperty, GaussPoint *gp);
-
-    virtual void give3dMaterialStiffnessMatrix(FloatMatrix &answer,
-                                               MatResponseMode mode, GaussPoint *gp,
-                                               TimeStep *tStep);
-
-    /// Computes local 3d stiffness matrix of the receiver.
-    virtual void give3dLocalMaterialStiffnessMatrix(FloatMatrix &answer,
-                                                    MatResponseMode mode, GaussPoint *gp,
-                                                    TimeStep *tStep);
+    void give3dMaterialStiffnessMatrix(FloatMatrix &answer,
+                                       MatResponseMode mode, GaussPoint *gp,
+                                       TimeStep *tStep) override;
 
 protected:
     void giveTensorRotationMatrix(FloatMatrix &answer, GaussPoint *gp);

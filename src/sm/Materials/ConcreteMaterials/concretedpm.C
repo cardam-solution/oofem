@@ -171,18 +171,12 @@ ConcreteDPMStatus :: printOutputAt(FILE *file, TimeStep *tStep)
     fprintf(file, "}\n");
 }
 
-contextIOResultType
-ConcreteDPMStatus :: saveContext(DataStream &stream, ContextMode mode, void *obj)
+void
+ConcreteDPMStatus :: saveContext(DataStream &stream, ContextMode mode)
 {
+    StructuralMaterialStatus :: saveContext(stream, mode);
+
     contextIOResultType iores;
-
-    // save parent class status
-    if ( ( iores = StructuralMaterialStatus :: saveContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    // write raw data
-
     if ( ( iores = plasticStrain.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
@@ -214,22 +208,15 @@ ConcreteDPMStatus :: saveContext(DataStream &stream, ContextMode mode, void *obj
     if ( !stream.write(le) ) {
         THROW_CIOERR(CIO_IOERR);
     }
-
-    return CIO_OK;
 }
 
 
-contextIOResultType
-ConcreteDPMStatus :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
+void
+ConcreteDPMStatus :: restoreContext(DataStream &stream, ContextMode mode)
 {
+    StructuralMaterialStatus :: restoreContext(stream, mode);
+
     contextIOResultType iores;
-
-    // read parent class status
-    if ( ( iores = StructuralMaterialStatus :: restoreContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    // read raw data
     if ( ( iores = plasticStrain.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
@@ -261,8 +248,6 @@ ConcreteDPMStatus :: restoreContext(DataStream &stream, ContextMode mode, void *
     if ( !stream.read(le) ) {
         THROW_CIOERR(CIO_IOERR);
     }
-
-    return CIO_OK;
 }
 
 int
@@ -295,6 +280,7 @@ ConcreteDPMStatus :: setIPValue(const FloatArray &value, InternalStateType type)
 
 ConcreteDPM :: ConcreteDPM(int n, Domain *d) :
     StructuralMaterial(n, d),
+    linearElasticMaterial(n,d),
     effectiveStress(_Unknown)
 {
     tempKappaP = kappaP = 0.;
@@ -303,7 +289,6 @@ ConcreteDPM :: ConcreteDPM(int n, Domain *d) :
     yieldTol = 0.;
     newtonIter = 0;
     helem = 0.;
-    linearElasticMaterial = new IsotropicLinearElasticMaterial(n, d);
 #ifdef SOPHISTICATED_SIZEDEPENDENT_ADJUSTMENT
     href = 0.;
 #endif
@@ -311,7 +296,6 @@ ConcreteDPM :: ConcreteDPM(int n, Domain *d) :
 
 ConcreteDPM :: ~ConcreteDPM()
 {
-    delete linearElasticMaterial;
 }
 
 IRResultType
@@ -326,7 +310,7 @@ ConcreteDPM :: initializeFrom(InputRecord *ir)
         return result;
     }
 
-    result = linearElasticMaterial->initializeFrom(ir);
+    result = linearElasticMaterial.initializeFrom(ir);
     if ( result != IRRT_OK ) {
         return result;
     }
@@ -404,7 +388,7 @@ ConcreteDPM :: giveRealStressVector_3d(FloatArray &answer,
                                     TimeStep *tStep)
 {
     FloatArray strain;
-    ConcreteDPMStatus *status = giveStatus(gp);
+    ConcreteDPMStatus *status = giveConcreteDPMStatus(gp);
 
     // Initialize temp variables for this gauss point
     status->initTempStatus();
@@ -464,7 +448,7 @@ ConcreteDPM :: giveRealStressVector_3d(FloatArray &answer,
 
 double ConcreteDPM :: computeDamage(const FloatArray &strain, GaussPoint *gp, TimeStep *tStep)
 {
-    ConcreteDPMStatus *status = giveStatus(gp);
+    ConcreteDPMStatus *status = giveConcreteDPMStatus(gp);
     double equivStrain;
     computeEquivalentStrain(equivStrain, strain, gp, tStep);
     double f = equivStrain - status->giveKappaD();
@@ -494,7 +478,7 @@ void
 ConcreteDPM :: computeEquivalentStrain(double &tempEquivStrain, const FloatArray &strain, GaussPoint *gp, TimeStep *tStep)
 {
     //The equivalent  strain is based on the volumetric plastic strain
-    ConcreteDPMStatus *status = giveStatus(gp);
+    ConcreteDPMStatus *status = giveConcreteDPMStatus(gp);
     tempKappaP = status->giveTempKappaP();
     kappaP = status->giveKappaP();
     double equivStrain = status->giveEquivStrain();
@@ -542,7 +526,7 @@ ConcreteDPM :: computeEquivalentStrain(double &tempEquivStrain, const FloatArray
 double
 ConcreteDPM :: computeInverseDamage(double dam, GaussPoint *gp)
 {
-    ConcreteDPMStatus *status = giveStatus(gp);
+    ConcreteDPMStatus *status = giveConcreteDPMStatus(gp);
     double le = status->giveLe();
     if ( le == 0. ) {
         if ( helem > 0. ) {
@@ -567,7 +551,7 @@ ConcreteDPM :: computeDamageParam(double kappa, GaussPoint *gp)
     if ( kappa > 0. ) {
         // iteration to achieve mesh objectivity
         // this is only valid for tension
-        ConcreteDPMStatus *status = giveStatus(gp);
+        ConcreteDPMStatus *status = giveConcreteDPMStatus(gp);
         int nite = 0;
         double R, Lhs, aux, aux1;
 
@@ -643,7 +627,7 @@ ConcreteDPM :: initDamaged(double kappaD,
     int indx = 1;
     FloatArray principalStrains, crackPlaneNormal(3);
     FloatMatrix principalDir(3, 3);
-    ConcreteDPMStatus *status = giveStatus(gp);
+    ConcreteDPMStatus *status = giveConcreteDPMStatus(gp);
 
     if ( helem > 0. ) {
         status->setLe(helem);
@@ -679,7 +663,7 @@ ConcreteDPM :: initDamaged(double kappaD,
 double
 ConcreteDPM :: computeDuctilityMeasureDamage(const FloatArray &strain, GaussPoint *gp)
 {
-    ConcreteDPMStatus *status = giveStatus(gp);
+    ConcreteDPMStatus *status = giveConcreteDPMStatus(gp);
     FloatArray plasticStrain = status->givePlasticStrain();
     FloatArray tempPlasticStrain = status->giveTempPlasticStrain();
     tempPlasticStrain.subtract(plasticStrain);
@@ -804,8 +788,6 @@ ConcreteDPM :: checkForVertexCase(double &answer,
 
     return false;
 }
-
-
 
 void
 ConcreteDPM :: performRegularReturn(FloatArray &effectiveStress,
@@ -1575,8 +1557,8 @@ ConcreteDPM :: give3dMaterialStiffnessMatrix(FloatMatrix &answer,
                                              GaussPoint *gp,
                                              TimeStep *tStep)
 {
-    ConcreteDPMStatus *status = giveStatus(gp);
-    this->giveLinearElasticMaterial()->give3dMaterialStiffnessMatrix(answer, mode, gp, tStep);
+    ConcreteDPMStatus *status = giveConcreteDPMStatus(gp);
+    this->linearElasticMaterial.give3dMaterialStiffnessMatrix(answer, mode, gp, tStep);
     if ( mode == SecantStiffness || mode == TangentStiffness ) {
         double omega = status->giveTempDamage();
         if ( omega > 0.9999 ) {
@@ -1601,7 +1583,7 @@ ConcreteDPM :: computeTrialCoordinates(const FloatArray &stress, GaussPoint *gp)
 void
 ConcreteDPM :: assignStateFlag(GaussPoint *gp)
 {
-    ConcreteDPMStatus *status = giveStatus(gp);
+    ConcreteDPMStatus *status = giveConcreteDPMStatus(gp);
     //Get kappaD from status to define state later on
     damage = status->giveDamage();
     tempDamage = status->giveTempDamage();
@@ -1794,7 +1776,7 @@ ConcreteDPM :: computeDRDCosTheta(const double theta, const double ecc) const
 void
 ConcreteDPM :: restoreConsistency(GaussPoint *gp)
 {
-    ConcreteDPMStatus *status = giveStatus(gp);
+    ConcreteDPMStatus *status = giveConcreteDPMStatus(gp);
 
     // compute kappaD from damage
     double kappaD = this->computeInverseDamage(status->giveDamage(), gp);
@@ -1817,7 +1799,7 @@ ConcreteDPM :: restoreConsistency(GaussPoint *gp)
 int
 ConcreteDPM :: setIPValue(const FloatArray &value, GaussPoint *gp, InternalStateType type)
 {
-    ConcreteDPMStatus *status = giveStatus(gp);
+    ConcreteDPMStatus *status = giveConcreteDPMStatus(gp);
     if ( status->setIPValue(value, type) ) {
         return 1;
     } else {
@@ -1828,7 +1810,7 @@ ConcreteDPM :: setIPValue(const FloatArray &value, GaussPoint *gp, InternalState
 int
 ConcreteDPM :: giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep)
 {
-    const ConcreteDPMStatus *status = giveStatus(gp);
+    const ConcreteDPMStatus *status = giveConcreteDPMStatus(gp);
     //int state_flag = status->giveStateFlag();
     //double stateFlagValue = 0.;
 

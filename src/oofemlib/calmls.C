@@ -941,27 +941,21 @@ void CylindricalALM :: convertHPCMap()
 }
 
 
-contextIOResultType
-CylindricalALM :: saveContext(DataStream &stream, ContextMode mode, void *obj)
+void
+CylindricalALM :: saveContext(DataStream &stream, ContextMode mode)
 {
-    // write current deltaL
     if ( !stream.write(deltaL) ) {
         THROW_CIOERR(CIO_IOERR);
     }
-
-    return CIO_OK;
 }
 
 
-contextIOResultType
-CylindricalALM :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
+void
+CylindricalALM :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    // read last deltaL
     if ( !stream.read(deltaL) ) {
         THROW_CIOERR(CIO_IOERR);
     }
-
-    return CIO_OK;
 }
 
 
@@ -974,7 +968,7 @@ CylindricalALM :: giveLinearSolver()
         }
     }
 
-    linSolver.reset( classFactory.createSparseLinSolver(solverType, domain, engngModel) );
+    linSolver = classFactory.createSparseLinSolver(solverType, domain, engngModel);
     if ( !linSolver ) {
         OOFEM_ERROR("linear solver creation failed for lstype %d", solverType);
     }

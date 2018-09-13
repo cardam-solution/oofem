@@ -1984,46 +1984,17 @@ TR1_2D_SUPG :: printOutputAt(FILE *file, TimeStep *tStep)
 }
 
 
-
-contextIOResultType TR1_2D_SUPG :: saveContext(DataStream &stream, ContextMode mode, void *obj)
-//
-// saves full element context (saves state variables, that completely describe
-// current state)
-//
+void TR1_2D_SUPG :: saveContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    if ( ( iores = SUPGElement :: saveContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    if ( ( iores = LEPlicElementInterface :: saveContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    return CIO_OK;
+    SUPGElement :: saveContext(stream, mode);
+    LEPlicElementInterface :: saveContext(stream, mode);
 }
 
 
-
-contextIOResultType TR1_2D_SUPG :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
-//
-// restores full element context (saves state variables, that completely describe
-// current state)
-//
+void TR1_2D_SUPG :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    if ( ( iores = SUPGElement :: restoreContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    if ( ( iores = LEPlicElementInterface :: restoreContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-
-    return CIO_OK;
+    SUPGElement :: restoreContext(stream, mode);
+    LEPlicElementInterface :: restoreContext(stream, mode);
 }
 
 
@@ -2117,12 +2088,12 @@ TR1_2D_SUPG :: LS_PCS_computeS(LevelSetPCS *ls, TimeStep *tStep)
             int prev_node = ( si > 1 ) ? si - 1 : 3;
             int next_node = ( si < 3 ) ? si + 1 : 1;
 
-            //double l = this->giveNode(si)->giveCoordinates()->distance(this->giveNode(next_node)->giveCoordinates());
+            //double l = distance( *this->giveNode(si)->giveCoordinates(), *this->giveNode(next_node)->giveCoordinates() );
             double t = fi.at(si) / ( fi.at(si) - fi.at(next_node) );
             x2 = x1 + t * ( this->giveNode(next_node)->giveCoordinate(1) - x1 );
             y2 = y1 + t * ( this->giveNode(next_node)->giveCoordinate(2) - y1 );
 
-            //l = this->giveNode(si)->giveCoordinates()->distance(this->giveNode(prev_node)->giveCoordinates());
+            //l = distance( this->giveNode(si)->giveCoordinates(), *this->giveNode(prev_node)->giveCoordinates() );
             t = fi.at(si) / ( fi.at(si) - fi.at(prev_node) );
             x3 = x1 + t * ( this->giveNode(prev_node)->giveCoordinate(1) - x1 );
             y3 = y1 + t * ( this->giveNode(prev_node)->giveCoordinate(2) - y1 );

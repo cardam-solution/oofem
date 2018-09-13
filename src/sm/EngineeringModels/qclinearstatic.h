@@ -123,7 +123,7 @@ protected:
     FloatArray FullSolvedDomainBox;
 
 public:
-    QClinearStatic(int i, EngngModel * _master = NULL);
+    QClinearStatic(int i, EngngModel *master = nullptr);
     virtual ~QClinearStatic();
 
     void postInitialize() override;
@@ -134,7 +134,7 @@ public:
     IRResultType initializeFrom(InputRecord *ir) override;
 
     // identification
-    const char *giveInputRecordName() const { return _IFT_QClinearStatic_Name; }
+    const char *giveInputRecordName() const override { return _IFT_QClinearStatic_Name; }
     const char *giveClassName() const override { return "QClinearStatic"; }
     fMode giveFormulation() override { return TL; }
 

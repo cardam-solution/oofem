@@ -433,7 +433,7 @@ NonLinearStatic :: proceedStep(int di, TimeStep *tStep)
         // first step  create space for stiffness Matrix
         //
         if ( !stiffnessMatrix ) {
-            stiffnessMatrix.reset( classFactory.createSparseMtrx(sparseMtrxType) );
+            stiffnessMatrix = classFactory.createSparseMtrx(sparseMtrxType);
         }
 
         if ( !stiffnessMatrix ) {
@@ -650,14 +650,12 @@ NonLinearStatic :: printOutputAt(FILE *file, TimeStep *tStep)
 }
 
 
-contextIOResultType
+void
 NonLinearStatic :: saveContext(DataStream &stream, ContextMode mode)
 {
     contextIOResultType iores;
 
-    if ( ( iores = EngngModel :: saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
+    EngngModel :: saveContext(stream, mode);
 
     if ( ( iores = totalDisplacement.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
@@ -687,19 +685,15 @@ NonLinearStatic :: saveContext(DataStream &stream, ContextMode mode)
     if ( ( iores = initialLoadVectorOfPrescribed.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
 
-contextIOResultType
+void
 NonLinearStatic :: restoreContext(DataStream &stream, ContextMode mode)
 {
     contextIOResultType iores;
 
-    if ( ( iores = EngngModel :: restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
+    EngngModel :: restoreContext(stream, mode);
 
     //if ((iores = this->giveNumericalMethod(giveCurrentStep())->restoreContext (stream)) !=CIO_OK) THROW_CIOERR(iores);
 
@@ -734,8 +728,6 @@ NonLinearStatic :: restoreContext(DataStream &stream, ContextMode mode)
     if ( ( iores = initialLoadVectorOfPrescribed.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
 
@@ -891,15 +883,15 @@ LoadBalancer *
 NonLinearStatic :: giveLoadBalancer()
 {
     if ( lb ) {
-        return lb;
+        return lb.get();
     }
 
     if ( loadBalancingFlag ) {
         ///@todo Make the name possibly optional (but currently, there is just one choice, "parmetis")
         lb = classFactory.createLoadBalancer( "parmetis", this->giveDomain(1) );
-        return lb;
+        return lb.get();
     } else {
-        return NULL;
+        return nullptr;
     }
 }
 
@@ -908,14 +900,14 @@ LoadBalancerMonitor *
 NonLinearStatic :: giveLoadBalancerMonitor()
 {
     if ( lbm ) {
-        return lbm;
+        return lbm.get();
     }
 
     if ( loadBalancingFlag ) {
         lbm = classFactory.createLoadBalancerMonitor( "wallclock", this);
-        return lbm;
+        return lbm.get();
     } else {
-        return NULL;
+        return nullptr;
     }
 }
 #endif

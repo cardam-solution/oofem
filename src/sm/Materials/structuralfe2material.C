@@ -341,27 +341,19 @@ StructuralFE2MaterialStatus :: updateYourself(TimeStep *tStep)
 }
 
 
-contextIOResultType
-StructuralFE2MaterialStatus :: saveContext(DataStream &stream, ContextMode mode, void *obj)
+void
+StructuralFE2MaterialStatus :: saveContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-    if ( ( iores = StructuralMaterialStatus :: saveContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    return this->rve->saveContext(stream, mode);
+    StructuralMaterialStatus :: saveContext(stream, mode);
+    this->rve->saveContext(stream, mode);
 }
 
 
-contextIOResultType
-StructuralFE2MaterialStatus :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
+void
+StructuralFE2MaterialStatus :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-    if ( ( iores = StructuralMaterialStatus :: restoreContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    return this->rve->restoreContext(stream, mode);
+    StructuralMaterialStatus :: restoreContext(stream, mode);
+    this->rve->restoreContext(stream, mode);
 }
 
 double StructuralFE2MaterialStatus :: giveRveLength()
@@ -412,7 +404,7 @@ void StructuralFE2MaterialStatus :: copyStateVariables(const MaterialStatus &iSt
             IRResultType result; // Required by IR_GIVE_FIELD macro
             std::vector<std::unique_ptr<EnrichmentItem>> eiList;
 
-            //DynamicInputRecord *xmanRec = new DynamicInputRecord();
+            //DynamicInputRecord *xmanRec = std::make_unique<DynamicInputRecord>();
             //ext_xMan->giveInputRecord(* xmanRec);
             //dataReader.insertInputRecord(DataReader :: IR_xfemManRec, xmanRec);
 

@@ -36,6 +36,7 @@
 #include "timestep.h"
 #include "dofdistributedprimaryfield.h"
 #include "maskedprimaryfield.h"
+#include "intvarfield.h"
 #include "tm/Elements/transportelement.h"
 #include "classfactory.h"
 #include "datastream.h"
@@ -118,6 +119,9 @@ TransientTransportProblem :: initializeFrom(InputRecord *ir)
             }
         }
     }
+    
+//     InternalVariableField(IST_HydrationDegree, FT_Unknown, MMA_ClosestPoint, this->giveDomain(1));
+    
 
     return EngngModel :: initializeFrom(ir);
 }
@@ -202,7 +206,7 @@ void TransientTransportProblem :: solveYourselfAt(TimeStep *tStep)
     field->initialize(VM_Total, tStep, solution, EModelDefaultEquationNumbering());
 
     if ( !effectiveMatrix ) {
-        effectiveMatrix.reset( classFactory.createSparseMtrx(sparseMtrxType) );
+        effectiveMatrix = classFactory.createSparseMtrx(sparseMtrxType);
         effectiveMatrix->buildInternalStructure( this, 1, EModelDefaultEquationNumbering() );
     }
 
@@ -396,33 +400,19 @@ TransientTransportProblem :: updateYourself(TimeStep *tStep)
     EngngModel :: updateYourself(tStep);
 }
 
-contextIOResultType
+void
 TransientTransportProblem :: saveContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    if ( ( iores = EngngModel :: saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    field->saveContext(stream, mode);
-
-    return CIO_OK;
+    EngngModel :: saveContext(stream, mode);
+    field->saveContext(stream);
 }
 
 
-contextIOResultType
+void
 TransientTransportProblem :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    if ( ( iores = EngngModel :: restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    field->restoreContext(stream, mode);
-
-    return CIO_OK;
+    EngngModel :: restoreContext(stream, mode);
+    field->restoreContext(stream);
 }
 
 

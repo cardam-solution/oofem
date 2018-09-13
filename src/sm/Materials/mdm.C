@@ -40,7 +40,6 @@
 #include "sm/Materials/isolinearelasticmaterial.h"
 #include "mmaclosestiptransfer.h"
 #include "nonlocalmaterialext.h"
-#include "microplane.h"
 #include "contextioerr.h"
 #include "classfactory.h"
 #include "dynamicinputrecord.h"
@@ -74,11 +73,7 @@ MMAClosestIPTransfer MDM :: mapper2;
 MaterialStatus *
 MDM :: CreateStatus(GaussPoint *gp) const
 {
-    if ( dynamic_cast< Microplane * >(gp) ) {
-        return NULL;
-    } else {
-        return new MDMStatus(1, this->nsd, this->numberOfMicroplanes, MicroplaneMaterial :: giveDomain(), gp);
-    }
+    return new MDMStatus(1, this->nsd, this->numberOfMicroplanes, MicroplaneMaterial :: giveDomain(), gp);
 }
 
 
@@ -206,20 +201,15 @@ void
 MDM :: computeLocalDamageTensor(FloatMatrix &damageTensor, const FloatArray &totalStrain,
                                 GaussPoint *gp, TimeStep *tStep)
 {
-    int im1;
-    double PsiOld, Psi;
     FloatArray damageVector(6);
-    Microplane *mPlane;
     MDMStatus *status = static_cast< MDMStatus * >( this->giveStatus(gp) );
 
     // Loop over microplanes.
     for ( int im = 0; im < numberOfMicroplanes; im++ ) {
-        mPlane = this->giveMicroplane(im, gp);
-        im1 = im + 1;
+        int im1 = im + 1;
 
-        Psi = computeDamageOnPlane(gp, mPlane, totalStrain);
-
-        PsiOld = status->giveMicroplaneDamage(im1);
+        double Psi = computeDamageOnPlane(gp, im1, totalStrain);
+        double PsiOld = status->giveMicroplaneDamage(im1);
         if ( PsiOld > Psi ) {
             Psi = PsiOld;
         }
@@ -274,7 +264,7 @@ MDM :: computeLocalDamageTensor(FloatMatrix &damageTensor, const FloatArray &tot
 #define HUGE_RELATIVE_COMPLIANCE 1.e20
 
 double
-MDM :: computeDamageOnPlane(GaussPoint *gp, Microplane *mplane, const FloatArray &strain)
+MDM :: computeDamageOnPlane(GaussPoint *gp, int mnumber, const FloatArray &strain)
 {
     double en, em, el, Ep, Efp, ParEpp;
     double Enorm = 0.0, sv = 0.0, answer = 0.0;
@@ -284,9 +274,9 @@ MDM :: computeDamageOnPlane(GaussPoint *gp, Microplane *mplane, const FloatArray
     StructuralMaterial :: giveInvertedVoigtVectorMask( mask, gp->giveMaterialMode() );
 
     StructuralMaterial :: giveFullSymVectorForm( fullStrain, strain, gp->giveMaterialMode() );
-    en = this->computeNormalStrainComponent(mplane, fullStrain);
-    em = this->computeShearMStrainComponent(mplane, fullStrain);
-    el = this->computeShearLStrainComponent(mplane, fullStrain);
+    en = this->computeNormalStrainComponent(mnumber, fullStrain);
+    em = this->computeShearMStrainComponent(mnumber, fullStrain);
+    el = this->computeShearLStrainComponent(mnumber, fullStrain);
 
 
     // request raw parameters
@@ -302,7 +292,7 @@ MDM :: computeDamageOnPlane(GaussPoint *gp, Microplane *mplane, const FloatArray
     }
 
     ParEpp = Ep / ( 1. - ParMd ); // 1d sv reduction
-    fmicroplane = linearElasticMaterial->give('E', gp) * ParEpp;
+    fmicroplane = linearElasticMaterial.give('E', gp) * ParEpp;
     // en /= (1.-ParMd*sv);
     en /= ( 1. - ParMd * sv / ( fmicroplane ) ); // suggested by P.Grassl (ParMd is unit dependent)
 
@@ -467,9 +457,9 @@ MDM :: computeEffectiveStress(FloatArray &stressPDC, const FloatArray &strainPDC
     FloatMatrix de;
     if ( mdmMode == mdm_3d ) {
         // PDC components in 3d mode are in full 3d format, even in planeStrain situation
-        this->giveLinearElasticMaterial()->give3dMaterialStiffnessMatrix(de, TangentStiffness, gp, tStep);
+        linearElasticMaterial.give3dMaterialStiffnessMatrix(de, TangentStiffness, gp, tStep);
     } else {
-        this->giveLinearElasticMaterial()->giveStiffnessMatrix(de, TangentStiffness, gp, tStep);
+        linearElasticMaterial.giveStiffnessMatrix(de, TangentStiffness, gp, tStep);
     }
 
     stressPDC.beProductOf(de, strainPDC);
@@ -529,7 +519,7 @@ MDM :: giveMaterialStiffnessMatrix(FloatMatrix &answer,
 {
     MDMStatus *status = static_cast< MDMStatus * >( this->giveStatus(gp) );
 
-    this->giveLinearElasticMaterial()->giveStiffnessMatrix(answer, TangentStiffness, gp, tStep);
+    this->linearElasticMaterial.giveStiffnessMatrix(answer, TangentStiffness, gp, tStep);
     //answer = de;
     //return;
     // if (isVirgin()) return ;
@@ -854,8 +844,7 @@ MDM :: initializeFrom(InputRecord *ir)
         if ( result != IRRT_OK ) return result;
     }
 
-    linearElasticMaterial = new IsotropicLinearElasticMaterial( 1, MicroplaneMaterial :: giveDomain() );
-    result = linearElasticMaterial->initializeFrom(ir);
+    result = linearElasticMaterial.initializeFrom(ir);
     if ( result != IRRT_OK ) return result;
 
 #ifdef MDM_MAPPING_DEBUG
@@ -876,7 +865,7 @@ MDM :: initializeFrom(InputRecord *ir)
 
 void MDM :: giveInputRecord(DynamicInputRecord &input)
 {
-    linearElasticMaterial->giveInputRecord(input);
+    linearElasticMaterial.giveInputRecord(input);
     MicroplaneMaterial :: giveInputRecord(input);
     StructuralNonlocalMaterialExtensionInterface :: giveInputRecord(input);
 #ifdef MDM_MAPPING_DEBUG
@@ -1003,7 +992,7 @@ MDM :: giveRawMDMParameters(double &Efp, double &Ep, const FloatArray &reducedSt
     // determine params from macroscopic ones
     if ( nonlocal ) {
         // formulas derived for 3d case
-        double EModulus = linearElasticMaterial->give('E', gp);
+        double EModulus = linearElasticMaterial.give('E', gp);
         double gammaf = ( EModulus * this->Gf ) / ( this->R * this->Ft * this->Ft );
         double gamma  = gammaf / ( 1.47 - 0.0014 * gammaf );
         double f = this->Ft / ( 1.56 + 0.006 * gamma ); // microplane tensile strength
@@ -1038,7 +1027,7 @@ MDM :: giveRawMDMParameters(double &Efp, double &Ep, const FloatArray &reducedSt
         dir.at(3) = dirs.at(3, indx);
 
         h  = gp->giveElement()->giveCharacteristicLength(dir);
-        double E  = this->giveLinearElasticMaterial()->give(Ex, gp);
+        double E  = linearElasticMaterial.give(Ex, gp);
         Ep = this->mdm_Ep;
         if ( nsd == 2 ) {
             Efp = ( Gf / ( h * E * Ep ) + 1.2 * Ep ) / 1.75 - Ep;
@@ -1112,14 +1101,12 @@ MDM :: initializeData(int numberOfMicroplanes)
             OOFEM_ERROR("required number of microplanes too big");
         }
 
-        int iplane;
-        int i, ii, jj;
         double alpha = M_PI / numberOfMicroplanes;
         FloatArray n(3), m(3), l(3);
 
         int ij [ 6 ] [ 2 ] = { { 1, 1 }, { 2, 2 }, { 3, 3 }, { 2, 3 }, { 3, 1 }, { 1, 2 } };
 
-        for ( iplane = 0; iplane < numberOfMicroplanes; iplane++ ) {
+        for ( int iplane = 0; iplane < numberOfMicroplanes; iplane++ ) {
             microplaneWeights [ iplane ] = alpha;
 
             n.at(1) = microplaneNormals [ iplane ] [ 0 ] = cos(iplane * alpha);
@@ -1135,9 +1122,9 @@ MDM :: initializeData(int numberOfMicroplanes)
             l.at(2) = 0.0;
             l.at(3) = 1.0;
 
-            for ( i = 0; i < 6; i++ ) {
-                ii = ij [ i ] [ 0 ];
-                jj = ij [ i ] [ 1 ];
+            for ( int i = 0; i < 6; i++ ) {
+                int ii = ij [ i ] [ 0 ];
+                int jj = ij [ i ] [ 1 ];
 
                 N [ iplane ] [ i ] = n.at(ii) * n.at(jj);
                 M [ iplane ] [ i ] = 0.5 * ( m.at(ii) * n.at(jj) + m.at(jj) * n.at(ii) );
@@ -1174,7 +1161,7 @@ MDM :: computeWeightFunction(const FloatArray &src, const FloatArray &coord)
 {
     // Bell shaped function decaying with the distance.
 
-    double dist = src.distance(coord);
+    double dist = distance(src, coord);
 
     if ( ( dist >= 0. ) && ( dist <= this->R ) ) {
         double help = ( 1. - dist * dist / ( R * R ) );
@@ -1196,8 +1183,8 @@ MDM :: MMI_map(GaussPoint *gp, Domain *oldd, TimeStep *tStep)
     toMap.at(1) = ( int ) IST_MicroplaneDamageValues;
 
     // Set up source element set if not set up by user
-    if ( sourceElemSet == NULL ) {
-        sourceElemSet = new Set(0, oldd);
+    if ( !sourceElemSet ) {
+        sourceElemSet = std::make_unique<Set>(0, oldd);
         IntArray el;
         // compile source list to contain all elements on old odmain with the same material id
         for ( int i = 1; i <= oldd->giveNumberOfElements(); i++ ) {
@@ -1394,16 +1381,12 @@ MDMStatus :: MDMStatus(int n, int nsd, int nmplanes, Domain *d, GaussPoint *g) :
 
 MDMStatus :: ~MDMStatus() { }
 
-contextIOResultType
-MDMStatus :: saveContext(DataStream &stream, ContextMode mode, void *obj)
+void
+MDMStatus :: saveContext(DataStream &stream, ContextMode mode)
 {
+    StructuralMaterialStatus :: saveContext(stream, mode);
+
     contextIOResultType iores;
-
-    // save parent class status
-    if ( ( iores = StructuralMaterialStatus :: saveContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
     if ( ( iores = Psi.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
@@ -1419,21 +1402,15 @@ MDMStatus :: saveContext(DataStream &stream, ContextMode mode, void *obj)
     if ( ( iores = damageTensorEigenVectors.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
 
-contextIOResultType
-MDMStatus :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
+void
+MDMStatus :: restoreContext(DataStream &stream, ContextMode mode)
 {
+    StructuralMaterialStatus :: restoreContext(stream, mode);
+
     contextIOResultType iores;
-
-    // read parent class status
-    if ( ( iores = StructuralMaterialStatus :: restoreContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
     if ( ( iores = Psi.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
@@ -1449,8 +1426,6 @@ MDMStatus :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
     if ( ( iores = damageTensorEigenVectors.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
 void

@@ -36,12 +36,50 @@
 #include "intarray.h"
 #include "floatarray.h"
 #include "floatmatrix.h"
+#include "floatarrayf.h"
+#include "floatmatrixf.h"
 #include "gaussintegrationrule.h"
 
 namespace oofem {
+
+FloatArrayF<20>
+FEI3dHexaQuad :: evalN(const FloatArrayF<3> &lcoords)
+{
+    //auto [u, v, w] = lcoords;
+    double u = lcoords[0];
+    double v = lcoords[1];
+    double w = lcoords[2];
+    return {
+        0.125 * ( 1.0 - u ) * ( 1.0 - v ) * ( 1.0 + w ) * ( -u - v + w - 2.0 ),
+        0.125 * ( 1.0 - u ) * ( 1.0 + v ) * ( 1.0 + w ) * ( -u + v + w - 2.0 ),
+        0.125 * ( 1.0 + u ) * ( 1.0 + v ) * ( 1.0 + w ) * ( u + v + w - 2.0 ),
+        0.125 * ( 1.0 + u ) * ( 1.0 - v ) * ( 1.0 + w ) * ( u - v + w - 2.0 ),
+        0.125 * ( 1.0 - u ) * ( 1.0 - v ) * ( 1.0 - w ) * ( -u - v - w - 2.0 ),
+        0.125 * ( 1.0 - u ) * ( 1.0 + v ) * ( 1.0 - w ) * ( -u + v - w - 2.0 ),
+        0.125 * ( 1.0 + u ) * ( 1.0 + v ) * ( 1.0 - w ) * ( u + v - w - 2.0 ),
+        0.125 * ( 1.0 + u ) * ( 1.0 - v ) * ( 1.0 - w ) * ( u - v - w - 2.0 ),
+        0.25 * ( 1.0 - v * v ) * ( 1.0 - u ) * ( 1.0 + w ),
+        0.25 * ( 1.0 - u * u ) * ( 1.0 + v ) * ( 1.0 + w ),
+        0.25 * ( 1.0 - v * v ) * ( 1.0 + u ) * ( 1.0 + w ),
+        0.25 * ( 1.0 - u * u ) * ( 1.0 - v ) * ( 1.0 + w ),
+        0.25 * ( 1.0 - v * v ) * ( 1.0 - u ) * ( 1.0 - w ),
+        0.25 * ( 1.0 - u * u ) * ( 1.0 + v ) * ( 1.0 - w ),
+        0.25 * ( 1.0 - v * v ) * ( 1.0 + u ) * ( 1.0 - w ),
+        0.25 * ( 1.0 - u * u ) * ( 1.0 - v ) * ( 1.0 - w ),
+        0.25 * ( 1.0 - u ) * ( 1.0 - v ) * ( 1.0 - w * w ),
+        0.25 * ( 1.0 - u ) * ( 1.0 + v ) * ( 1.0 - w * w ),
+        0.25 * ( 1.0 + u ) * ( 1.0 + v ) * ( 1.0 - w * w ),
+        0.25 * ( 1.0 + u ) * ( 1.0 - v ) * ( 1.0 - w * w )
+    };
+}
+
+
 void
 FEI3dHexaQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
 {
+#if 0
+    answer = evalN(lcoords);
+#else
     double u, v, w;
     answer.resize(20);
 
@@ -72,22 +110,196 @@ FEI3dHexaQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEIC
     answer.at(18)  = 0.25 * ( 1.0 - u ) * ( 1.0 + v ) * ( 1.0 - w * w );
     answer.at(19)  = 0.25 * ( 1.0 + u ) * ( 1.0 + v ) * ( 1.0 - w * w );
     answer.at(20)  = 0.25 * ( 1.0 + u ) * ( 1.0 - v ) * ( 1.0 - w * w );
+#endif
 }
+
+
+FloatMatrixF<3,20>
+FEI3dHexaQuad :: evaldNdxi(const FloatArrayF<3> &lcoords)
+{
+    //auto [u, v, w] = lcoords;
+    double u = lcoords[0];
+    double v = lcoords[1];
+    double w = lcoords[2];
+
+    return {
+        0.125 * ( 1.0 - v ) * ( 1.0 + w ) * ( 2.0 * u + v - w + 1.0 ),
+        0.125 * ( 1.0 - u ) * ( 1.0 + w ) * ( 2.0 * v + u - w + 1.0 ),
+        0.125 * ( 1.0 - u ) * ( 1.0 - v ) * ( 2.0 * w - u - v - 1.0 ),
+        0.125 * ( 1.0 + v ) * ( 1.0 + w ) * ( 2.0 * u - v - w + 1.0 ),
+        0.125 * ( 1.0 - u ) * ( 1.0 + w ) * ( 2.0 * v - u + w - 1.0 ),
+        0.125 * ( 1.0 - u ) * ( 1.0 + v ) * ( 2.0 * w - u + v - 1.0 ),
+        0.125 * ( 1.0 + v ) * ( 1.0 + w ) * ( 2.0 * u + v + w - 1.0 ),
+        0.125 * ( 1.0 + u ) * ( 1.0 + w ) * ( 2.0 * v + u + w - 1.0 ),
+        0.125 * ( 1.0 + u ) * ( 1.0 + v ) * ( 2.0 * w + u + v - 1.0 ),
+        0.125 * ( 1.0 - v ) * ( 1.0 + w ) * ( 2.0 * u - v + w - 1.0 ),
+        0.125 * ( 1.0 + u ) * ( 1.0 + w ) * ( 2.0 * v - u - w + 1.0 ),
+        0.125 * ( 1.0 + u ) * ( 1.0 - v ) * ( 2.0 * w + u - v - 1.0 ),
+        0.125 * ( 1.0 - v ) * ( 1.0 - w ) * ( 2.0 * u + v + w + 1.0 ),
+        0.125 * ( 1.0 - u ) * ( 1.0 - w ) * ( 2.0 * v + u + w + 1.0 ),
+        0.125 * ( 1.0 - u ) * ( 1.0 - v ) * ( 2.0 * w + u + v + 1.0 ),
+        0.125 * ( 1.0 + v ) * ( 1.0 - w ) * ( 2.0 * u - v + w + 1.0 ),
+        0.125 * ( 1.0 - u ) * ( 1.0 - w ) * ( 2.0 * v - u - w - 1.0 ),
+        0.125 * ( 1.0 - u ) * ( 1.0 + v ) * ( 2.0 * w + u - v + 1.0 ),
+        0.125 * ( 1.0 + v ) * ( 1.0 - w ) * ( 2.0 * u + v - w - 1.0 ),
+        0.125 * ( 1.0 + u ) * ( 1.0 - w ) * ( 2.0 * v + u - w - 1.0 ),
+        0.125 * ( 1.0 + u ) * ( 1.0 + v ) * ( 2.0 * w - u - v + 1.0 ),
+        0.125 * ( 1.0 - v ) * ( 1.0 - w ) * ( 2.0 * u - v - w - 1.0 ),
+        0.125 * ( 1.0 + u ) * ( 1.0 - w ) * ( 2.0 * v - u + w + 1.0 ),
+        0.125 * ( 1.0 + u ) * ( 1.0 - v ) * ( 2.0 * w - u + v + 1.0 ),
+        -0.25 * ( 1.0 - v * v ) * ( 1.0 + w ),
+        -0.50 * v * ( 1.0 - u ) * ( 1.0 + w ),
+        0.25 * ( 1.0 - v * v ) * ( 1.0 - u ),
+        -0.50 * u * ( 1.0 + v ) * ( 1.0 + w ),
+        0.25 * ( 1.0 - u * u ) * ( 1.0 + w ),
+        0.25 * ( 1.0 - u * u ) * ( 1.0 + v ),
+        -0.50 * v * ( 1.0 + u ) * ( 1.0 + w ),
+        0.25 * ( 1.0 - v * v ) * ( 1.0 + w ),
+        0.25 * ( 1.0 - v * v ) * ( 1.0 + u ),
+        -0.50 * u * ( 1.0 - v ) * ( 1.0 + w ),
+        -0.25 * ( 1.0 - u * u ) * ( 1.0 + w ),
+        0.25 * ( 1.0 - u * u ) * ( 1.0 - v ),
+        -0.25 * ( 1.0 - v * v ) * ( 1.0 - w ),
+        -0.50 * v * ( 1.0 - u ) * ( 1.0 - w ),
+        -0.25 * ( 1.0 - v * v ) * ( 1.0 - u ),
+        -0.50 * u * ( 1.0 + v ) * ( 1.0 - w ),
+        0.25 * ( 1.0 - u * u ) * ( 1.0 - w ),
+        -0.25 * ( 1.0 - u * u ) * ( 1.0 + v ),
+        0.25 * ( 1.0 - v * v ) * ( 1.0 - w ),
+        -0.50 * v * ( 1.0 + u ) * ( 1.0 - w ),
+        -0.25 * ( 1.0 - v * v ) * ( 1.0 + u ),
+        -0.50 * u * ( 1.0 - v ) * ( 1.0 - w ),
+        -0.25 * ( 1.0 - u * u ) * ( 1.0 - w ),
+        -0.25 * ( 1.0 - u * u ) * ( 1.0 - v ),
+        -0.25 * ( 1.0 - v ) * ( 1.0 - w * w ),
+        -0.25 * ( 1.0 - u ) * ( 1.0 - w * w ),
+        -0.50 * ( 1.0 - u ) * ( 1.0 - v ) * w,
+        -0.25 * ( 1.0 + v ) * ( 1.0 - w * w ),
+        0.25 * ( 1.0 - u ) * ( 1.0 - w * w ),
+        -0.50 * ( 1.0 - u ) * ( 1.0 + v ) * w,
+        0.25 * ( 1.0 + v ) * ( 1.0 - w * w ),
+        0.25 * ( 1.0 + u ) * ( 1.0 - w * w ),
+        -0.50 * ( 1.0 + u ) * ( 1.0 + v ) * w,
+        0.25 * ( 1.0 - v ) * ( 1.0 - w * w ),
+        -0.25 * ( 1.0 + u ) * ( 1.0 - w * w ),
+        -0.50 * ( 1.0 + u ) * ( 1.0 - v ) * w,
+    };
+}
+
+
+void
+FEI3dHexaQuad :: evaldNdxi(FloatMatrix &dN, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
+{
+#if 0
+    dN = evaldNdxi(lcoords);
+#else
+    double u, v, w;
+    u = lcoords.at(1);
+    v = lcoords.at(2);
+    w = lcoords.at(3);
+
+    dN.resize(20, 3);
+
+    dN.at(1, 1) = 0.125 * ( 1.0 - v ) * ( 1.0 + w ) * ( 2.0 * u + v - w + 1.0 );
+    dN.at(2, 1) = 0.125 * ( 1.0 + v ) * ( 1.0 + w ) * ( 2.0 * u - v - w + 1.0 );
+    dN.at(3, 1) = 0.125 * ( 1.0 + v ) * ( 1.0 + w ) * ( 2.0 * u + v + w - 1.0 );
+    dN.at(4, 1) = 0.125 * ( 1.0 - v ) * ( 1.0 + w ) * ( 2.0 * u - v + w - 1.0 );
+    dN.at(5, 1) = 0.125 * ( 1.0 - v ) * ( 1.0 - w ) * ( 2.0 * u + v + w + 1.0 );
+    dN.at(6, 1) = 0.125 * ( 1.0 + v ) * ( 1.0 - w ) * ( 2.0 * u - v + w + 1.0 );
+    dN.at(7, 1) = 0.125 * ( 1.0 + v ) * ( 1.0 - w ) * ( 2.0 * u + v - w - 1.0 );
+    dN.at(8, 1) = 0.125 * ( 1.0 - v ) * ( 1.0 - w ) * ( 2.0 * u - v - w - 1.0 );
+    dN.at(9, 1) = -0.25 * ( 1.0 - v * v ) * ( 1.0 + w );
+    dN.at(10, 1) =  -0.5 * u * ( 1.0 + v ) * ( 1.0 + w );
+    dN.at(11, 1) =  0.25 * ( 1.0 - v * v ) * ( 1.0 + w );
+    dN.at(12, 1) =  -0.5 * u * ( 1.0 - v ) * ( 1.0 + w );
+    dN.at(13, 1) = -0.25 * ( 1.0 - v * v ) * ( 1.0 - w );
+    dN.at(14, 1) =  -0.5 * u * ( 1.0 + v ) * ( 1.0 - w );
+    dN.at(15, 1) =  0.25 * ( 1.0 - v * v ) * ( 1.0 - w );
+    dN.at(16, 1) =  -0.5 * u * ( 1.0 - v ) * ( 1.0 - w );
+    dN.at(17, 1) = -0.25 * ( 1.0 - v ) * ( 1.0 - w * w );
+    dN.at(18, 1) = -0.25 * ( 1.0 + v ) * ( 1.0 - w * w );
+    dN.at(19, 1) =  0.25 * ( 1.0 + v ) * ( 1.0 - w * w );
+    dN.at(20, 1) =  0.25 * ( 1.0 - v ) * ( 1.0 - w * w );
+
+    dN.at(1, 2) = 0.125 * ( 1.0 - u ) * ( 1.0 + w ) * ( 2.0 * v + u - w + 1.0 );
+    dN.at(2, 2) = 0.125 * ( 1.0 - u ) * ( 1.0 + w ) * ( 2.0 * v - u + w - 1.0 );
+    dN.at(3, 2) = 0.125 * ( 1.0 + u ) * ( 1.0 + w ) * ( 2.0 * v + u + w - 1.0 );
+    dN.at(4, 2) = 0.125 * ( 1.0 + u ) * ( 1.0 + w ) * ( 2.0 * v - u - w + 1.0 );
+    dN.at(5, 2) = 0.125 * ( 1.0 - u ) * ( 1.0 - w ) * ( 2.0 * v + u + w + 1.0 );
+    dN.at(6, 2) = 0.125 * ( 1.0 - u ) * ( 1.0 - w ) * ( 2.0 * v - u - w - 1.0 );
+    dN.at(7, 2) = 0.125 * ( 1.0 + u ) * ( 1.0 - w ) * ( 2.0 * v + u - w - 1.0 );
+    dN.at(8, 2) = 0.125 * ( 1.0 + u ) * ( 1.0 - w ) * ( 2.0 * v - u + w + 1.0 );
+    dN.at(9, 2) =  -0.5 * v * ( 1.0 - u ) * ( 1.0 + w );
+    dN.at(10, 2) =  0.25 * ( 1.0 - u * u ) * ( 1.0 + w );
+    dN.at(11, 2) =  -0.5 * v * ( 1.0 + u ) * ( 1.0 + w );
+    dN.at(12, 2) = -0.25 * ( 1.0 - u * u ) * ( 1.0 + w );
+    dN.at(13, 2) =  -0.5 * v * ( 1.0 - u ) * ( 1.0 - w );
+    dN.at(14, 2) =  0.25 * ( 1.0 - u * u ) * ( 1.0 - w );
+    dN.at(15, 2) =  -0.5 * v * ( 1.0 + u ) * ( 1.0 - w );
+    dN.at(16, 2) = -0.25 * ( 1.0 - u * u ) * ( 1.0 - w );
+    dN.at(17, 2) = -0.25 * ( 1.0 - u ) * ( 1.0 - w * w );
+    dN.at(18, 2) =  0.25 * ( 1.0 - u ) * ( 1.0 - w * w );
+    dN.at(19, 2) =  0.25 * ( 1.0 + u ) * ( 1.0 - w * w );
+    dN.at(20, 2) = -0.25 * ( 1.0 + u ) * ( 1.0 - w * w );
+
+    dN.at(1, 3) = 0.125 * ( 1.0 - u ) * ( 1.0 - v ) * ( 2.0 * w - u - v - 1.0 );
+    dN.at(2, 3) = 0.125 * ( 1.0 - u ) * ( 1.0 + v ) * ( 2.0 * w - u + v - 1.0 );
+    dN.at(3, 3) = 0.125 * ( 1.0 + u ) * ( 1.0 + v ) * ( 2.0 * w + u + v - 1.0 );
+    dN.at(4, 3) = 0.125 * ( 1.0 + u ) * ( 1.0 - v ) * ( 2.0 * w + u - v - 1.0 );
+    dN.at(5, 3) = 0.125 * ( 1.0 - u ) * ( 1.0 - v ) * ( 2.0 * w + u + v + 1.0 );
+    dN.at(6, 3) = 0.125 * ( 1.0 - u ) * ( 1.0 + v ) * ( 2.0 * w + u - v + 1.0 );
+    dN.at(7, 3) = 0.125 * ( 1.0 + u ) * ( 1.0 + v ) * ( 2.0 * w - u - v + 1.0 );
+    dN.at(8, 3) = 0.125 * ( 1.0 + u ) * ( 1.0 - v ) * ( 2.0 * w - u + v + 1.0 );
+    dN.at(9, 3) =  0.25 * ( 1.0 - v * v ) * ( 1.0 - u );
+    dN.at(10, 3) =  0.25 * ( 1.0 - u * u ) * ( 1.0 + v );
+    dN.at(11, 3) =  0.25 * ( 1.0 - v * v ) * ( 1.0 + u );
+    dN.at(12, 3) =  0.25 * ( 1.0 - u * u ) * ( 1.0 - v );
+    dN.at(13, 3) = -0.25 * ( 1.0 - v * v ) * ( 1.0 - u );
+    dN.at(14, 3) = -0.25 * ( 1.0 - u * u ) * ( 1.0 + v );
+    dN.at(15, 3) = -0.25 * ( 1.0 - v * v ) * ( 1.0 + u );
+    dN.at(16, 3) = -0.25 * ( 1.0 - u * u ) * ( 1.0 - v );
+    dN.at(17, 3) =  -0.5 * ( 1.0 - u ) * ( 1.0 - v ) * w;
+    dN.at(18, 3) =  -0.5 * ( 1.0 - u ) * ( 1.0 + v ) * w;
+    dN.at(19, 3) =  -0.5 * ( 1.0 + u ) * ( 1.0 + v ) * w;
+    dN.at(20, 3) =  -0.5 * ( 1.0 + u ) * ( 1.0 - v ) * w;
+#endif
+}
+
+
+std::pair<double, FloatMatrixF<3,20>>
+FEI3dHexaQuad :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry &cellgeo)
+{
+    auto dNduvw = evaldNdxi(lcoords);
+    FloatMatrixF<3,20> coords;
+    for ( int i = 0; i < 20; i++ ) {
+        ///@todo cellgeo should give a FloatArrayF<3>, this will add a "costly" construction now:
+        coords.setColumn(cellgeo.giveVertexCoordinates(i+1), i);
+    }
+    auto jacT = dotT(dNduvw, coords);
+    return {det(jacT), dot(inv(jacT), dNduvw)};
+}
+
 
 double
 FEI3dHexaQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
 {
+#if 0
+    auto tmp = evaldNdx(lcoords, cellgeo);
+    answer = tmp.second;
+    return tmp.first;
+#else
     FloatMatrix jacobianMatrix, inv, dNduvw, coords;
-    this->giveLocalDerivative(dNduvw, lcoords);
+    this->evaldNdxi(dNduvw, lcoords, cellgeo);
     coords.resize( 3, dNduvw.giveNumberOfRows() );
     for ( int i = 1; i <= dNduvw.giveNumberOfRows(); i++ ) {
-        coords.setColumn(* cellgeo.giveVertexCoordinates(i), i);
+        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
     }
     jacobianMatrix.beProductOf(coords, dNduvw);
     inv.beInverseOf(jacobianMatrix);
 
     answer.beProductOf(dNduvw, inv);
     return jacobianMatrix.giveDeterminant();
+#endif
 }
 
 void
@@ -98,16 +310,16 @@ FEI3dHexaQuad :: local2global(FloatArray &answer, const FloatArray &lcoords, con
     this->evalN(n, lcoords, cellgeo);
     answer.clear();
     for ( int i = 1; i <= n.giveSize(); i++ ) {
-        answer.add( n.at(i), * cellgeo.giveVertexCoordinates(i) );
+        answer.add( n.at(i), cellgeo.giveVertexCoordinates(i) );
     }
 }
 
 double FEI3dHexaQuad :: giveCharacteristicLength(const FEICellGeometry &cellgeo) const
 {
-    const FloatArray *n1 = cellgeo.giveVertexCoordinates(1);
-    const FloatArray *n2 = cellgeo.giveVertexCoordinates(7);
+    const auto &n1 = cellgeo.giveVertexCoordinates(1);
+    const auto &n2 = cellgeo.giveVertexCoordinates(7);
     ///@todo Change this so that it is not dependent on node order.
-    return n1->distance(n2);
+    return distance(n1, n2);
 }
 
 
@@ -182,9 +394,9 @@ void FEI3dHexaQuad :: edgeLocal2global(FloatArray &answer, int iedge, const Floa
     double u = lcoords.at(1);
     this->computeLocalEdgeMapping(eNodes, iedge);
     answer.clear();
-    answer.add( 0.5 * ( u - 1. ) * u, * cellgeo.giveVertexCoordinates( eNodes.at(1) ) );
-    answer.add( 0.5 * ( u - 1. ) * u, * cellgeo.giveVertexCoordinates( eNodes.at(2) ) );
-    answer.add( 1. - u * u,       * cellgeo.giveVertexCoordinates( eNodes.at(3) ) );
+    answer.add( 0.5 * ( u - 1. ) * u, cellgeo.giveVertexCoordinates( eNodes.at(1) ) );
+    answer.add( 0.5 * ( u - 1. ) * u, cellgeo.giveVertexCoordinates( eNodes.at(2) ) );
+    answer.add( 1. - u * u, cellgeo.giveVertexCoordinates( eNodes.at(3) ) );
 }
 
 void FEI3dHexaQuad :: edgeEvaldNdx(FloatMatrix &answer, int iedge, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
@@ -194,9 +406,9 @@ void FEI3dHexaQuad :: edgeEvaldNdx(FloatMatrix &answer, int iedge, const FloatAr
     FloatArray dNdu;
     double u = lcoords.at(1);
     this->computeLocalEdgeMapping(eNodes, iedge);
-    dNdu.add( u - 0.5, * cellgeo.giveVertexCoordinates( eNodes.at(1) ) );
-    dNdu.add( u + 0.5, * cellgeo.giveVertexCoordinates( eNodes.at(2) ) );
-    dNdu.add( -2. * u, * cellgeo.giveVertexCoordinates( eNodes.at(3) ) );
+    dNdu.add( u - 0.5, cellgeo.giveVertexCoordinates( eNodes.at(1) ) );
+    dNdu.add( u + 0.5, cellgeo.giveVertexCoordinates( eNodes.at(2) ) );
+    dNdu.add( -2. * u, cellgeo.giveVertexCoordinates( eNodes.at(3) ) );
     // Why matrix output?
     answer.resize(3, 1);
     answer.setColumn(dNdu, 1);
@@ -208,9 +420,9 @@ double FEI3dHexaQuad :: edgeGiveTransformationJacobian(int iedge, const FloatArr
     FloatArray dNdu;
     double u = lcoords.at(1);
     this->computeLocalEdgeMapping(eNodes, iedge);
-    dNdu.add( u - 0.5, * cellgeo.giveVertexCoordinates( eNodes.at(1) ) );
-    dNdu.add( u + 0.5, * cellgeo.giveVertexCoordinates( eNodes.at(2) ) );
-    dNdu.add( -2. * u, * cellgeo.giveVertexCoordinates( eNodes.at(3) ) );
+    dNdu.add( u - 0.5, cellgeo.giveVertexCoordinates( eNodes.at(1) ) );
+    dNdu.add( u + 0.5, cellgeo.giveVertexCoordinates( eNodes.at(2) ) );
+    dNdu.add( -2. * u, cellgeo.giveVertexCoordinates( eNodes.at(3) ) );
     return dNdu.computeNorm();
 }
 
@@ -352,8 +564,8 @@ FEI3dHexaQuad :: surfaceEvalNormal(FloatArray &answer, int isurf, const FloatArr
     dNdeta.at(8) = -eta * ( 1. + ksi );
 
     for ( int i = 1; i <= 8; ++i ) {
-        a.add( dNdksi.at(i), * cellgeo.giveVertexCoordinates( snodes.at(i) ) );
-        b.add( dNdeta.at(i), * cellgeo.giveVertexCoordinates( snodes.at(i) ) );
+        a.add( dNdksi.at(i), cellgeo.giveVertexCoordinates( snodes.at(i) ) );
+        b.add( dNdeta.at(i), cellgeo.giveVertexCoordinates( snodes.at(i) ) );
     }
 
     answer.beVectorProductOf(a, b);
@@ -373,7 +585,7 @@ FEI3dHexaQuad :: surfaceLocal2global(FloatArray &answer, int isurf,
 
     answer.clear();
     for ( int i = 1; i <= n.giveSize(); ++i ) {
-        answer.add( n.at(i), * cellgeo.giveVertexCoordinates( nodes.at(i) ) );
+        answer.add( n.at(i), cellgeo.giveVertexCoordinates( nodes.at(i) ) );
     }
 }
 
@@ -479,87 +691,12 @@ FEI3dHexaQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatAr
 // Returns the jacobian matrix  J (x,y,z)/(ksi,eta,dzeta)  of the receiver.
 {
     FloatMatrix dNduvw, coords;
-    this->giveLocalDerivative(dNduvw, lcoords);
+    this->evaldNdxi(dNduvw, lcoords, cellgeo);
     coords.resize( 3, dNduvw.giveNumberOfRows() );
     for ( int i = 1; i <= dNduvw.giveNumberOfRows(); i++ ) {
-        coords.setColumn(* cellgeo.giveVertexCoordinates(i), i);
+        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
     }
     jacobianMatrix.beProductOf(coords, dNduvw);
-}
-
-
-void
-FEI3dHexaQuad :: giveLocalDerivative(FloatMatrix &dN, const FloatArray &lcoords)
-{
-    double u, v, w;
-    u = lcoords.at(1);
-    v = lcoords.at(2);
-    w = lcoords.at(3);
-
-    dN.resize(20, 3);
-
-    dN.at(1, 1) = 0.125 * ( 1.0 - v ) * ( 1.0 + w ) * ( 2.0 * u + v - w + 1.0 );
-    dN.at(2, 1) = 0.125 * ( 1.0 + v ) * ( 1.0 + w ) * ( 2.0 * u - v - w + 1.0 );
-    dN.at(3, 1) = 0.125 * ( 1.0 + v ) * ( 1.0 + w ) * ( 2.0 * u + v + w - 1.0 );
-    dN.at(4, 1) = 0.125 * ( 1.0 - v ) * ( 1.0 + w ) * ( 2.0 * u - v + w - 1.0 );
-    dN.at(5, 1) = 0.125 * ( 1.0 - v ) * ( 1.0 - w ) * ( 2.0 * u + v + w + 1.0 );
-    dN.at(6, 1) = 0.125 * ( 1.0 + v ) * ( 1.0 - w ) * ( 2.0 * u - v + w + 1.0 );
-    dN.at(7, 1) = 0.125 * ( 1.0 + v ) * ( 1.0 - w ) * ( 2.0 * u + v - w - 1.0 );
-    dN.at(8, 1) = 0.125 * ( 1.0 - v ) * ( 1.0 - w ) * ( 2.0 * u - v - w - 1.0 );
-    dN.at(9, 1) = -0.25 * ( 1.0 - v * v ) * ( 1.0 + w );
-    dN.at(10, 1) =  -0.5 * u * ( 1.0 + v ) * ( 1.0 + w );
-    dN.at(11, 1) =  0.25 * ( 1.0 - v * v ) * ( 1.0 + w );
-    dN.at(12, 1) =  -0.5 * u * ( 1.0 - v ) * ( 1.0 + w );
-    dN.at(13, 1) = -0.25 * ( 1.0 - v * v ) * ( 1.0 - w );
-    dN.at(14, 1) =  -0.5 * u * ( 1.0 + v ) * ( 1.0 - w );
-    dN.at(15, 1) =  0.25 * ( 1.0 - v * v ) * ( 1.0 - w );
-    dN.at(16, 1) =  -0.5 * u * ( 1.0 - v ) * ( 1.0 - w );
-    dN.at(17, 1) = -0.25 * ( 1.0 - v ) * ( 1.0 - w * w );
-    dN.at(18, 1) = -0.25 * ( 1.0 + v ) * ( 1.0 - w * w );
-    dN.at(19, 1) =  0.25 * ( 1.0 + v ) * ( 1.0 - w * w );
-    dN.at(20, 1) =  0.25 * ( 1.0 - v ) * ( 1.0 - w * w );
-
-    dN.at(1, 2) = 0.125 * ( 1.0 - u ) * ( 1.0 + w ) * ( 2.0 * v + u - w + 1.0 );
-    dN.at(2, 2) = 0.125 * ( 1.0 - u ) * ( 1.0 + w ) * ( 2.0 * v - u + w - 1.0 );
-    dN.at(3, 2) = 0.125 * ( 1.0 + u ) * ( 1.0 + w ) * ( 2.0 * v + u + w - 1.0 );
-    dN.at(4, 2) = 0.125 * ( 1.0 + u ) * ( 1.0 + w ) * ( 2.0 * v - u - w + 1.0 );
-    dN.at(5, 2) = 0.125 * ( 1.0 - u ) * ( 1.0 - w ) * ( 2.0 * v + u + w + 1.0 );
-    dN.at(6, 2) = 0.125 * ( 1.0 - u ) * ( 1.0 - w ) * ( 2.0 * v - u - w - 1.0 );
-    dN.at(7, 2) = 0.125 * ( 1.0 + u ) * ( 1.0 - w ) * ( 2.0 * v + u - w - 1.0 );
-    dN.at(8, 2) = 0.125 * ( 1.0 + u ) * ( 1.0 - w ) * ( 2.0 * v - u + w + 1.0 );
-    dN.at(9, 2) =  -0.5 * v * ( 1.0 - u ) * ( 1.0 + w );
-    dN.at(10, 2) =  0.25 * ( 1.0 - u * u ) * ( 1.0 + w );
-    dN.at(11, 2) =  -0.5 * v * ( 1.0 + u ) * ( 1.0 + w );
-    dN.at(12, 2) = -0.25 * ( 1.0 - u * u ) * ( 1.0 + w );
-    dN.at(13, 2) =  -0.5 * v * ( 1.0 - u ) * ( 1.0 - w );
-    dN.at(14, 2) =  0.25 * ( 1.0 - u * u ) * ( 1.0 - w );
-    dN.at(15, 2) =  -0.5 * v * ( 1.0 + u ) * ( 1.0 - w );
-    dN.at(16, 2) = -0.25 * ( 1.0 - u * u ) * ( 1.0 - w );
-    dN.at(17, 2) = -0.25 * ( 1.0 - u ) * ( 1.0 - w * w );
-    dN.at(18, 2) =  0.25 * ( 1.0 - u ) * ( 1.0 - w * w );
-    dN.at(19, 2) =  0.25 * ( 1.0 + u ) * ( 1.0 - w * w );
-    dN.at(20, 2) = -0.25 * ( 1.0 + u ) * ( 1.0 - w * w );
-
-    dN.at(1, 3) = 0.125 * ( 1.0 - u ) * ( 1.0 - v ) * ( 2.0 * w - u - v - 1.0 );
-    dN.at(2, 3) = 0.125 * ( 1.0 - u ) * ( 1.0 + v ) * ( 2.0 * w - u + v - 1.0 );
-    dN.at(3, 3) = 0.125 * ( 1.0 + u ) * ( 1.0 + v ) * ( 2.0 * w + u + v - 1.0 );
-    dN.at(4, 3) = 0.125 * ( 1.0 + u ) * ( 1.0 - v ) * ( 2.0 * w + u - v - 1.0 );
-    dN.at(5, 3) = 0.125 * ( 1.0 - u ) * ( 1.0 - v ) * ( 2.0 * w + u + v + 1.0 );
-    dN.at(6, 3) = 0.125 * ( 1.0 - u ) * ( 1.0 + v ) * ( 2.0 * w + u - v + 1.0 );
-    dN.at(7, 3) = 0.125 * ( 1.0 + u ) * ( 1.0 + v ) * ( 2.0 * w - u - v + 1.0 );
-    dN.at(8, 3) = 0.125 * ( 1.0 + u ) * ( 1.0 - v ) * ( 2.0 * w - u + v + 1.0 );
-    dN.at(9, 3) =  0.25 * ( 1.0 - v * v ) * ( 1.0 - u );
-    dN.at(10, 3) =  0.25 * ( 1.0 - u * u ) * ( 1.0 + v );
-    dN.at(11, 3) =  0.25 * ( 1.0 - v * v ) * ( 1.0 + u );
-    dN.at(12, 3) =  0.25 * ( 1.0 - u * u ) * ( 1.0 - v );
-    dN.at(13, 3) = -0.25 * ( 1.0 - v * v ) * ( 1.0 - u );
-    dN.at(14, 3) = -0.25 * ( 1.0 - u * u ) * ( 1.0 + v );
-    dN.at(15, 3) = -0.25 * ( 1.0 - v * v ) * ( 1.0 + u );
-    dN.at(16, 3) = -0.25 * ( 1.0 - u * u ) * ( 1.0 - v );
-    dN.at(17, 3) =  -0.5 * ( 1.0 - u ) * ( 1.0 - v ) * w;
-    dN.at(18, 3) =  -0.5 * ( 1.0 - u ) * ( 1.0 + v ) * w;
-    dN.at(19, 3) =  -0.5 * ( 1.0 + u ) * ( 1.0 + v ) * w;
-    dN.at(20, 3) =  -0.5 * ( 1.0 + u ) * ( 1.0 - v ) * w;
 }
 
 
@@ -569,14 +706,14 @@ FEI3dHexaQuad :: evalNXIntegral(int iEdge, const FEICellGeometry &cellgeo)
     IntArray fNodes;
     this->computeLocalSurfaceMapping(fNodes, iEdge);
 
-    const FloatArray &c1 = * cellgeo.giveVertexCoordinates( fNodes.at(1) );
-    const FloatArray &c2 = * cellgeo.giveVertexCoordinates( fNodes.at(2) );
-    const FloatArray &c3 = * cellgeo.giveVertexCoordinates( fNodes.at(3) );
-    const FloatArray &c4 = * cellgeo.giveVertexCoordinates( fNodes.at(4) );
-    const FloatArray &c5 = * cellgeo.giveVertexCoordinates( fNodes.at(5) );
-    const FloatArray &c6 = * cellgeo.giveVertexCoordinates( fNodes.at(6) );
-    const FloatArray &c7 = * cellgeo.giveVertexCoordinates( fNodes.at(7) );
-    const FloatArray &c8 = * cellgeo.giveVertexCoordinates( fNodes.at(8) );
+    const FloatArray &c1 = cellgeo.giveVertexCoordinates( fNodes.at(1) );
+    const FloatArray &c2 = cellgeo.giveVertexCoordinates( fNodes.at(2) );
+    const FloatArray &c3 = cellgeo.giveVertexCoordinates( fNodes.at(3) );
+    const FloatArray &c4 = cellgeo.giveVertexCoordinates( fNodes.at(4) );
+    const FloatArray &c5 = cellgeo.giveVertexCoordinates( fNodes.at(5) );
+    const FloatArray &c6 = cellgeo.giveVertexCoordinates( fNodes.at(6) );
+    const FloatArray &c7 = cellgeo.giveVertexCoordinates( fNodes.at(7) );
+    const FloatArray &c8 = cellgeo.giveVertexCoordinates( fNodes.at(8) );
 
     // Generated with Mathematica (rather unwieldy expression, tried to simplify it as good as possible, but it could probably be better)
     return (
@@ -640,21 +777,21 @@ FEI3dHexaQuad :: evalNXIntegral(int iEdge, const FEICellGeometry &cellgeo)
 }
 
 
-IntegrationRule *
+std::unique_ptr<IntegrationRule>
 FEI3dHexaQuad :: giveIntegrationRule(int order)
 {
-    IntegrationRule *iRule = new GaussIntegrationRule(1, NULL);
+    auto iRule = std::make_unique<GaussIntegrationRule>(1, nullptr);
     int points = iRule->getRequiredNumberOfIntegrationPoints(_Cube, order + 9);
     iRule->SetUpPointsOnCube(points, _Unknown);
-    return iRule;
+    return std::move(iRule);
 }
 
-IntegrationRule *
+std::unique_ptr<IntegrationRule>
 FEI3dHexaQuad :: giveBoundaryIntegrationRule(int order, int boundary)
 {
-    IntegrationRule *iRule = new GaussIntegrationRule(1, NULL);
+    auto iRule = std::make_unique<GaussIntegrationRule>(1, nullptr);
     int points = iRule->getRequiredNumberOfIntegrationPoints(_Square, order + 4);
     iRule->SetUpPointsOnSquare(points, _Unknown);
-    return iRule;
+    return std::move(iRule);
 }
 } // end namespace oofem

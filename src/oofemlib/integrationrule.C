@@ -95,9 +95,9 @@ GaussPoint *
 IntegrationRule :: findIntegrationPointClosestTo(const FloatArray &lcoord)
 {
     double mindist = -1.;
-    GaussPoint *minGp = NULL;
+    GaussPoint *minGp = nullptr;
     for ( GaussPoint *gp: *this ) {
-        double dist = lcoord.distance_square(gp->giveNaturalCoordinates());
+        double dist = distance_square(lcoord, gp->giveNaturalCoordinates());
         if ( dist <= mindist || mindist < 0. ) {
             mindist = dist;
             minGp = gp;
@@ -111,7 +111,7 @@ void
 IntegrationRule :: printOutputAt(FILE *file, TimeStep *tStep)
 // Performs end-of-step operations.
 {
-    for ( GaussPoint *gp: *this ) {
+    for ( auto &gp: *this ) {
         gp->printOutputAt(file, tStep);
     }
 }
@@ -120,20 +120,15 @@ void
 IntegrationRule :: updateYourself(TimeStep *tStep)
 {
     // Updates the receiver at end of step.
-    for ( GaussPoint *gp: *this ) {
+    for ( auto &gp: *this ) {
         gp->updateYourself(tStep);
     }
 }
 
 
-contextIOResultType
-IntegrationRule :: saveContext(DataStream &stream, ContextMode mode, void *obj)
+void
+IntegrationRule :: saveContext(DataStream &stream, ContextMode mode)
 {
-    //
-    // saves full  context (saves state variables, that completely describe
-    // current state)
-    //
-
     contextIOResultType iores;
 
     int isdyn = isDynamic;
@@ -161,7 +156,7 @@ IntegrationRule :: saveContext(DataStream &stream, ContextMode mode, void *obj)
         }
     }
 
-    for ( GaussPoint *gp: *this ) {
+    for ( auto &gp: *this ) {
         if ( mode & CM_Definition ) {
             // write gp weight, coordinates, element number, and material mode
             double dval = gp->giveWeight();
@@ -182,22 +177,13 @@ IntegrationRule :: saveContext(DataStream &stream, ContextMode mode, void *obj)
         }
 
         // write gp data
-        if ( ( iores = gp->giveCrossSection()->saveIPContext(stream, mode, gp) ) != CIO_OK ) {
-            THROW_CIOERR(iores);
-        }
+        gp->giveCrossSection()->saveIPContext(stream, mode, gp);
     }
-
-    return CIO_OK;
 }
 
-contextIOResultType
-IntegrationRule :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
+void
+IntegrationRule :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    //
-    // restores full element context (saves state variables, that completely describe
-    // current state)
-    //
-
     contextIOResultType iores;
     int size;
 
@@ -227,12 +213,12 @@ IntegrationRule :: restoreContext(DataStream &stream, ContextMode mode, void *ob
         }
 
         this->clear();
-        
+
         this->gaussPoints.resize(size);
     }
 
     int i = 1;
-    for ( GaussPoint *&gp: *this ) {
+    for ( auto &gp: *this ) {
         if ( mode & CM_Definition ) {
             // read weight
             double w;
@@ -263,12 +249,8 @@ IntegrationRule :: restoreContext(DataStream &stream, ContextMode mode, void *ob
         }
 
         // read gp data
-        if ( ( iores = gp->giveCrossSection()->restoreIPContext(stream, mode, gp) ) != CIO_OK ) {
-            THROW_CIOERR(iores);
-        }
+        gp->giveCrossSection()->restoreIPContext(stream, mode, gp);
     }
-
-    return CIO_OK;
 }
 
 

@@ -128,7 +128,7 @@ protected:
     std::unique_ptr<SparseLinearSystemNM> nMethod;
 
 public:
-    NlDEIDynamic(int i, EngngModel * _master = NULL);
+    NlDEIDynamic(int i, EngngModel *master = nullptr);
 
     virtual ~NlDEIDynamic();
 
@@ -142,8 +142,8 @@ public:
     TimeStep *giveNextStep() override;
     NumericalMethod *giveNumericalMethod(MetaStep *mStep) override;
 
-    contextIOResultType saveContext(DataStream &stream, ContextMode mode) override;
-    contextIOResultType restoreContext(DataStream &stream, ContextMode mode) override;
+    void saveContext(DataStream &stream, ContextMode mode) override;
+    void restoreContext(DataStream &stream, ContextMode mode) override;
 
     void printOutputAt(FILE *file, TimeStep *tStep) override;
 

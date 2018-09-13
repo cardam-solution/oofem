@@ -46,18 +46,11 @@ namespace oofem {
 REGISTER_EnrichmentFront(EnrFrontLinearBranchFuncOneEl)
 
 
-EnrFrontLinearBranchFuncOneEl :: EnrFrontLinearBranchFuncOneEl()
-{
-    mpBranchFunc = new LinElBranchFunction();
-}
+EnrFrontLinearBranchFuncOneEl :: EnrFrontLinearBranchFuncOneEl() :
+    mpBranchFunc()
+{ }
 
-EnrFrontLinearBranchFuncOneEl :: ~EnrFrontLinearBranchFuncOneEl()
-{
-    if ( mpBranchFunc != NULL ) {
-        delete mpBranchFunc;
-        mpBranchFunc = NULL;
-    }
-}
+EnrFrontLinearBranchFuncOneEl :: ~EnrFrontLinearBranchFuncOneEl() { }
 
 
 void EnrFrontLinearBranchFuncOneEl :: MarkNodesAsFront(std :: unordered_map< int, NodeEnrichmentType > &ioNodeEnrMarkerMap, XfemManager &ixFemMan,  const std :: unordered_map< int, double > &iLevelSetNormalDirMap, const std :: unordered_map< int, double > &iLevelSetTangDirMap, const TipInfo &iTipInfo)
@@ -88,7 +81,7 @@ void EnrFrontLinearBranchFuncOneEl :: evaluateEnrFuncAt(std :: vector< double > 
     double r = 0.0, theta = 0.0;
     EnrichmentItem :: calcPolarCoord(r, theta, xTip, pos, n, t, iEfInput, flipTangent);
 
-    mpBranchFunc->evaluateEnrFuncAt(oEnrFunc, r, theta);
+    mpBranchFunc.evaluateEnrFuncAt(oEnrFunc, r, theta);
 
 #ifdef DEBUG
     for ( double val:oEnrFunc ) {
@@ -114,7 +107,7 @@ void EnrFrontLinearBranchFuncOneEl :: evaluateEnrFuncDerivAt(std :: vector< Floa
 
 
     size_t sizeStart = oEnrFuncDeriv.size();
-    mpBranchFunc->evaluateEnrFuncDerivAt(oEnrFuncDeriv, r, theta);
+    mpBranchFunc.evaluateEnrFuncDerivAt(oEnrFuncDeriv, r, theta);
 
     /**
      * Transform to global coordinates.
@@ -137,10 +130,10 @@ void EnrFrontLinearBranchFuncOneEl :: evaluateEnrFuncJumps(std :: vector< double
     const FloatArray &xTip = mTipInfo.mGlobalCoord;
     const FloatArray &gpCoord = iGP.giveGlobalCoordinates();
 
-    double radius = gpCoord.distance(xTip);
+    double radius = distance(gpCoord, xTip);
 
     std :: vector< double >jumps;
-    mpBranchFunc->giveJump(jumps, radius);
+    mpBranchFunc.giveJump(jumps, radius);
 
     oEnrFuncJumps.insert( oEnrFuncJumps.end(), jumps.begin(), jumps.end() );
 }

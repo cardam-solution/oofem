@@ -706,46 +706,22 @@ PFEM :: updateDofUnknownsDictionaryVelocities(DofManager *inode, TimeStep *tStep
 
 
 // NOT ACTIVE
-contextIOResultType
+void
 PFEM :: saveContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    if ( ( iores = EngngModel :: saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    if ( ( iores = PressureField.saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    if ( ( iores = VelocityField.saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    return CIO_OK;
+    EngngModel :: saveContext(stream, mode);
+    PressureField.saveContext(stream, mode);
+    VelocityField.saveContext(stream, mode);
 }
 
 
 // NOT ACTIVE
-contextIOResultType
+void
 PFEM :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    if ( ( iores = EngngModel :: restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    if ( ( iores = PressureField.restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    if ( ( iores = VelocityField.restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    return CIO_OK;
+    EngngModel :: restoreContext(stream, mode);
+    PressureField.restoreContext(stream, mode);
+    VelocityField.restoreContext(stream, mode);
 }
 
 
@@ -918,9 +894,9 @@ PFEM :: deactivateTooCloseParticles()
             PFEMParticle *particle2 = dynamic_cast< PFEMParticle * >( element->giveNode(2) );
             PFEMParticle *particle3 = dynamic_cast< PFEMParticle * >( element->giveNode(3) );
 
-            double l12 = particle1->giveCoordinates()->distance( particle2->giveCoordinates() );
-            double l23 = particle2->giveCoordinates()->distance( particle3->giveCoordinates() );
-            double l31 = particle3->giveCoordinates()->distance( particle1->giveCoordinates() );
+            double l12 = distance( *particle1->giveCoordinates(), *particle2->giveCoordinates() );
+            double l23 = distance( *particle2->giveCoordinates(), *particle3->giveCoordinates() );
+            double l31 = distance( *particle3->giveCoordinates(), *particle1->giveCoordinates() );
 
             double maxLength = max( l12, max(l23, l31) );
             double minLength = min( l12, min(l23, l31) );

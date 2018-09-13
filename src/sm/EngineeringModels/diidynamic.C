@@ -70,7 +70,7 @@ NumericalMethod *DIIDynamic :: giveNumericalMethod(MetaStep *mStep)
         return nMethod.get();
     }
 
-    nMethod.reset( classFactory.createSparseLinSolver(solverType, this->giveDomain(1), this) );
+    nMethod = classFactory.createSparseLinSolver(solverType, this->giveDomain(1), this);
     if ( !nMethod ) {
         OOFEM_ERROR("linear solver creation failed for lstype %d", solverType);
     }
@@ -258,7 +258,7 @@ void DIIDynamic :: solveYourselfAt(TimeStep *tStep)
 #ifdef VERBOSE
         OOFEM_LOG_DEBUG("Assembling stiffness matrix\n");
 #endif
-        stiffnessMatrix.reset( classFactory.createSparseMtrx(sparseMtrxType) );
+        stiffnessMatrix = classFactory.createSparseMtrx(sparseMtrxType);
         if ( !stiffnessMatrix ) {
             OOFEM_ERROR("sparse matrix creation failed");
         }
@@ -621,13 +621,11 @@ DIIDynamic :: determineConstants(TimeStep *tStep)
 }
 
 
-contextIOResultType DIIDynamic :: saveContext(DataStream &stream, ContextMode mode)
+void DIIDynamic :: saveContext(DataStream &stream, ContextMode mode)
 {
     contextIOResultType iores;
 
-    if ( ( iores = EngngModel :: saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
+    EngngModel :: saveContext(stream, mode);
 
     if ( ( iores = displacementVector.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
@@ -648,17 +646,13 @@ contextIOResultType DIIDynamic :: saveContext(DataStream &stream, ContextMode mo
     if ( ( iores = previousIncrementOfDisplacement.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
-contextIOResultType DIIDynamic :: restoreContext(DataStream &stream, ContextMode mode)
+void DIIDynamic :: restoreContext(DataStream &stream, ContextMode mode)
 {
     contextIOResultType iores;
 
-    if ( ( iores = EngngModel :: restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
+    EngngModel :: restoreContext(stream, mode);
 
     if ( ( iores = displacementVector.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
@@ -679,7 +673,5 @@ contextIOResultType DIIDynamic :: restoreContext(DataStream &stream, ContextMode
     if ( ( iores = previousIncrementOfDisplacement.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 } // end namespace oofem

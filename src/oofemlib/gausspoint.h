@@ -100,9 +100,9 @@ private:
     /// Natural Element Coordinates of receiver.
     FloatArray naturalCoordinates;
     /// Optional local sub-patch (sub-patches form element volume) coordinates of the receiver.
-    FloatArray *subPatchCoordinates;
+    std::unique_ptr<FloatArray> subPatchCoordinates;
     /// Optional global (Cartesian) coordinates
-    FloatArray *globalCoordinates;
+    std::unique_ptr<FloatArray> globalCoordinates;
     /// Integration weight.
     double weight;
     /// Material mode of receiver.
@@ -111,9 +111,9 @@ private:
 protected:
     // layer and fibered material support
     /// List of slave integration points.
-    std::vector< GaussPoint * >gaussPoints;
+    std::vector< GaussPoint * > gaussPoints;
     /// Status of e.g. material in point
-    IntegrationPointStatus *materialStatus;
+    std::unique_ptr<IntegrationPointStatus> materialStatus;
 
 public:
     /**
@@ -125,23 +125,21 @@ public:
      * @param w Integration weight.
      * @param mode Material mode.
      */
-    GaussPoint(IntegrationRule * ir, int n, FloatArray iNaturalCoord, double w, MaterialMode mode);
+    GaussPoint(IntegrationRule *ir, int n, FloatArray iNaturalCoord, double w, MaterialMode mode);
 
-    GaussPoint(IntegrationRule * ir, int n, double w, MaterialMode mode);
+    GaussPoint(IntegrationRule *ir, int n, double w, MaterialMode mode);
 
-    /// Destructor
-    virtual ~GaussPoint();
+    ~GaussPoint();
 
     /// Returns i-th natural element coordinate of receiver
     double giveNaturalCoordinate(int i) const { return naturalCoordinates.at(i); }
     /// Returns coordinate array of receiver.
     const FloatArray &giveNaturalCoordinates() { return naturalCoordinates; }
-    void setNaturalCoordinates(const FloatArray &c) {
-        naturalCoordinates = c;
-    }
+    void setNaturalCoordinates(const FloatArray &c) { naturalCoordinates = c; }
 
     /// Returns local sub-patch coordinates of the receiver
-    const FloatArray &giveSubPatchCoordinates() {
+    const FloatArray &giveSubPatchCoordinates()
+    {
         if ( subPatchCoordinates ) {
             return *subPatchCoordinates;
         } else {
@@ -153,32 +151,32 @@ public:
         if ( subPatchCoordinates ) {
             * subPatchCoordinates = c;
         } else {
-            subPatchCoordinates = new FloatArray(c);
+            subPatchCoordinates = std::make_unique<FloatArray>(c);
         }
     }
 
-    inline const FloatArray &giveGlobalCoordinates() {
-        if( globalCoordinates ) {
+    inline const FloatArray &giveGlobalCoordinates()
+    {
+        if ( globalCoordinates ) {
             return *globalCoordinates;
-        }
-        else {
-            globalCoordinates = new FloatArray();
+        } else {
+            globalCoordinates = std::make_unique<FloatArray>();
             this->giveElement()->computeGlobalCoordinates(*globalCoordinates, naturalCoordinates);
             return *globalCoordinates;
         }
     }
 
-    void setGlobalCoordinates(const FloatArray &iCoord) {
-        if( globalCoordinates ) {
+    void setGlobalCoordinates(const FloatArray &iCoord)
+    {
+        if ( globalCoordinates ) {
             *globalCoordinates = iCoord;
-        }
-        else {
-            globalCoordinates = new FloatArray(iCoord);
+        } else {
+            globalCoordinates = std::make_unique<FloatArray>(iCoord);
         }
     }
 
     /// Returns  integration weight of receiver.
-    virtual double giveWeight() { return weight; }
+    double giveWeight() { return weight; }
     void setWeight(double w) { weight = w; }
     /// Returns number of receiver.
     int giveNumber() { return number; }
@@ -202,7 +200,7 @@ public:
     /**
      * Returns reference to associated material status (NULL if not defined).
      */
-    IntegrationPointStatus *giveMaterialStatus() { return this->materialStatus; }
+    IntegrationPointStatus *giveMaterialStatus() { return this->materialStatus.get(); }
 
     /**
      * Sets Material status managed by receiver.
@@ -222,10 +220,10 @@ public:
      */
     IntegrationPointStatus *setMaterialStatus(IntegrationPointStatus *ptr)
     {
-        if ( this->materialStatus != NULL ) {
+        if ( this->materialStatus ) {
             OOFEM_ERROR("status already exist");
         }
-        this->materialStatus = ptr;
+        this->materialStatus.reset(ptr);
         return ptr;
     }
     /**
@@ -234,7 +232,7 @@ public:
      * @return Slave gp.
      */
     GaussPoint *giveSlaveGaussPoint(int index);
-   
+
     /**
      * True if gauss point has slave points. Otherwise false.
      */
@@ -248,53 +246,20 @@ public:
      * associated status is called. The same function is also invoked for all available
      * slaves of receiver.
      */
-    virtual void printOutputAt(FILE *file, TimeStep *tStep);
+    void printOutputAt(FILE *file, TimeStep *tStep);
     /**
      * Updates internal state of receiver after finishing time step.
      * Material::updateYourself (receiver, tStep) function is called to
      * update material status. Same function is also invoked for
      * all receiver's slaves.
      */
-    virtual void updateYourself(TimeStep *tStep);
-
-    // store & restore context functions
-    /*
-     * Stores receiver state to output stream, including associated material status.
-     * Warning: Slaves are not saved, they must be saved by corresponding
-     * cross section or material model, which creates these slaves.
-     * This is because they may have special weights and coordinates,
-     * and these are not saved into context file, because they remain the same
-     * during whole solution (only variables which vary are stored into context).
-     * Note: does not invoke FEMComponents saveContext, since this writes only
-     * class id header, but typically due to large number of IPs,
-     * this is avoided.
-     * @exception throws an ContextIOERR exception if error encountered.
-     */
-    //contextIOResultType saveContext (FILE* stream, void *obj = NULL);
-    /*
-     * Restores receiver state to output stream, including associated material status.
-     * Warning: Slaves are not restored, they must be restored by corresponding
-     * cross section or material model, which creates these slaves.
-     * This is because they may have special weights and coordinates,
-     * and these are not saved into context file, because they remain the same
-     * during whole solution (only variables which vary are stored into context).
-     * Note: does not invoke FEMComponents restoreContext, since this writes only
-     * class id header, but typically due to large number of IPs,
-     * this is avoided.
-     * @exception throws an ContextIOERR exception if error encountered.
-     */
-    //contextIOResultType restoreContext(FILE* stream, void *obj = NULL);
+    void updateYourself(TimeStep *tStep);
 
     /// Returns class name of the receiver.
-    virtual const char *giveClassName() const { return "GaussPoint"; }
-    /// Initializes receiver according to object description stored in input record.
-    virtual IRResultType initializeFrom(InputRecord *ir) { return IRRT_OK; }
+    const char *giveClassName() const { return "GaussPoint"; }
 
     friend class LayeredCrossSection;
-    friend class MicroplaneMaterial;
     friend class FiberedCrossSection;
-    //friend class Material;
-    //friend class LayeredMaterial;
 };
 
 typedef GaussPoint IntegrationPoint;

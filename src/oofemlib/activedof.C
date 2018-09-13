@@ -256,22 +256,19 @@ double ActiveDof :: giveBcValue(ValueModeType mode, TimeStep *tStep)
 
 
 // Not sure of initial conditions yet.
-bool ActiveDof :: hasIc(TimeStep *tStep) { return false; }
 bool ActiveDof :: hasIcOn(ValueModeType type) { return false; }
 bool ActiveDof :: hasIc() { return false; }
 int ActiveDof :: giveIcId() { return 0; }
 InitialCondition *ActiveDof :: giveIc() { return NULL; }
 
 
-contextIOResultType ActiveDof :: saveContext(DataStream &stream, ContextMode mode, void *obj)
+void ActiveDof :: saveContext(DataStream &stream, ContextMode mode)
 {
     // Nothing here since the boundary condition deals with all the values.
-    return CIO_OK;
 }
 
-contextIOResultType ActiveDof :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
+void ActiveDof :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    return CIO_OK;
 }
 
 inline Dof *ActiveDof :: giveMasterDof(int i)

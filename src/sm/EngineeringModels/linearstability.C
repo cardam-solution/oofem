@@ -72,7 +72,7 @@ LinearStability :: LinearStability(int i, EngngModel *master) : StructuralEngngM
 NumericalMethod *LinearStability :: giveNumericalMethod(MetaStep *mStep)
 {
     if ( !nMethod ) {
-        nMethod.reset( classFactory.createGeneralizedEigenValueSolver(solverType, this->giveDomain(1), this) );
+        nMethod = classFactory.createGeneralizedEigenValueSolver(solverType, this->giveDomain(1), this);
         if ( !nMethod ) {
             OOFEM_ERROR("solver creation failed");
         }
@@ -85,7 +85,7 @@ NumericalMethod *LinearStability :: giveNumericalMethod(MetaStep *mStep)
 SparseLinearSystemNM *LinearStability :: giveNumericalMethodForLinStaticProblem(TimeStep *tStep)
 {
     if ( !nMethodLS ) {
-        nMethodLS.reset( classFactory.createSparseLinSolver(ST_Direct, this->giveDomain(1), this) ); ///@todo Support other solvers
+        nMethodLS = classFactory.createSparseLinSolver(ST_Direct, this->giveDomain(1), this); ///@todo Support other solvers
         if ( !nMethodLS ) {
             OOFEM_ERROR("solver creation failed");
         }
@@ -193,7 +193,7 @@ void LinearStability :: solveYourselfAt(TimeStep *tStep)
         //
         // first step - solve linear static problem
         //
-        stiffnessMatrix.reset( classFactory.createSparseMtrx(SMT_Skyline) ); ///@todo Don't hardcode skyline matrix only
+        stiffnessMatrix = classFactory.createSparseMtrx(SMT_Skyline); ///@todo Don't hardcode skyline matrix only
         stiffnessMatrix->buildInternalStructure( this, 1, EModelDefaultEquationNumbering() );
     }
 
@@ -315,7 +315,7 @@ void LinearStability :: doStepOutput(TimeStep *tStep)
             dman->updateYourself(&step);
         }
 
-        exportModuleManager->doOutput(&step);
+        exportModuleManager.doOutput(&step);
     }
 }
 
@@ -372,43 +372,29 @@ void LinearStability :: setActiveVector(int activeVector)
 }
 
 
-contextIOResultType LinearStability :: saveContext(DataStream &stream, ContextMode mode)
+void LinearStability :: saveContext(DataStream &stream, ContextMode mode)
 {
+    StructuralEngngModel :: saveContext(stream, mode);
+
+    field->saveContext(stream);
+
     contextIOResultType iores;
-
-    if ( ( iores = StructuralEngngModel :: saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    if ( ( iores = field->saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
     if ( ( iores = eigVal.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
 
-contextIOResultType LinearStability :: restoreContext(DataStream &stream, ContextMode mode)
+void LinearStability :: restoreContext(DataStream &stream, ContextMode mode)
 {
+    StructuralEngngModel :: restoreContext(stream, mode);
+
+    field->restoreContext(stream);
+
     contextIOResultType iores;
-
-    if ( ( iores = StructuralEngngModel :: restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    if ( ( iores = field->restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
     if ( ( iores = eigVal.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
 

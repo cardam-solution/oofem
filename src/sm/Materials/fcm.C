@@ -43,21 +43,12 @@
 #include <cstring>
 
 namespace oofem {
-FCMMaterial :: FCMMaterial(int n, Domain *d) : StructuralMaterial(n, d)
-    //
-    // constructor
-    //
-{
-    ecsMethod = ECSM_Unknown;
-    linearElasticMaterial = NULL;
-}
-
-
-FCMMaterial :: ~FCMMaterial()
-//
-// destructor
-//
+FCMMaterial :: FCMMaterial(int n, Domain *d) : StructuralMaterial(n, d),
+    linearElasticMaterial(n, d),
+    ecsMethod(ECSM_Unknown)
 {}
+
+FCMMaterial :: ~FCMMaterial() {}
 
 int
 FCMMaterial :: hasMaterialModeCapability(MaterialMode mode)
@@ -1257,7 +1248,6 @@ FCMMaterial :: giveMaterialStiffnessMatrix(FloatMatrix &answer,
 //
 {
     FCMMaterialStatus *status = static_cast< FCMMaterialStatus * >( this->giveStatus(gp) );
-    StructuralMaterial *lMat = static_cast< StructuralMaterial * >( this->giveLinearElasticMaterial() );
 
     MaterialMode mMode = gp->giveMaterialMode();
 
@@ -1270,7 +1260,7 @@ FCMMaterial :: giveMaterialStiffnessMatrix(FloatMatrix &answer,
 
     // ELASTIC MATRIX
     if ( ( rMode == ElasticStiffness ) || ( numberOfActiveCracks == 0 ) ) {
-        lMat->giveStiffnessMatrix(D, rMode, gp, tStep);
+        linearElasticMaterial.giveStiffnessMatrix(D, rMode, gp, tStep);
 
         overallElasticStiffness = this->computeOverallElasticStiffness();
         if ( overallElasticStiffness != ( this->give('E', gp) ) ) {
@@ -1283,7 +1273,7 @@ FCMMaterial :: giveMaterialStiffnessMatrix(FloatMatrix &answer,
 
     // SECANT OR TANGENT MATRIX - first in local direction
     nMaxCracks = status->giveMaxNumberOfCracks(gp);
-    lMat->giveStiffnessMatrix(De, rMode, gp, tStep);
+    linearElasticMaterial.giveStiffnessMatrix(De, rMode, gp, tStep);
 
     overallElasticStiffness = this->computeOverallElasticStiffness();
     if ( overallElasticStiffness != ( this->give('E', gp) ) ) {
@@ -1430,6 +1420,11 @@ FCMMaterial :: initializeFrom(InputRecord *ir)
         return result;
     }
 
+    result = linearElasticMaterial.initializeFrom(ir);
+    if ( result != IRRT_OK ) {
+        return result;
+    }
+
     this->nAllowedCracks = 3;
     IR_GIVE_OPTIONAL_FIELD(ir, nAllowedCracks, _IFT_FCM_nAllowedCracks);
 
@@ -1466,7 +1461,7 @@ FCMMaterial :: initializeFrom(InputRecord *ir)
 double
 FCMMaterial :: give(int aProperty, GaussPoint *gp)
 {
-    return linearElasticMaterial->give(aProperty, gp);
+    return linearElasticMaterial.give(aProperty, gp);
 }
 
 
@@ -1947,22 +1942,12 @@ FCMMaterialStatus :: updateYourself(TimeStep *tStep)
 
 
 
-contextIOResultType
-FCMMaterialStatus :: saveContext(DataStream &stream, ContextMode mode, void *obj)
-//
-// saves full information stored in this Status
-// no temp variables stored
-//
+void
+FCMMaterialStatus :: saveContext(DataStream &stream, ContextMode mode)
 {
+    StructuralMaterialStatus :: saveContext(stream, mode);
+
     contextIOResultType iores;
-
-    // save parent class status
-    if ( ( iores = StructuralMaterialStatus :: saveContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    // write a raw data
-
     if ( ( iores = crackStatuses.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
@@ -2002,25 +1987,14 @@ FCMMaterialStatus :: saveContext(DataStream &stream, ContextMode mode, void *obj
     if ( ( iores = transMatrix_L2Gstress.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
-contextIOResultType
-FCMMaterialStatus :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
-//
-// restores full information stored in stream to this Status
-//
+void
+FCMMaterialStatus :: restoreContext(DataStream &stream, ContextMode mode)
 {
+    StructuralMaterialStatus :: restoreContext(stream, mode);
+
     contextIOResultType iores;
-
-    // read parent class status
-    if ( ( iores = StructuralMaterialStatus :: restoreContext(stream, mode, obj) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    // read raw data
-
     if ( ( iores = crackStatuses.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
@@ -2056,7 +2030,5 @@ FCMMaterialStatus :: restoreContext(DataStream &stream, ContextMode mode, void *
     if ( ( iores = transMatrix_L2Gstress.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK; // return succes
 }
 } // end namespace oofem

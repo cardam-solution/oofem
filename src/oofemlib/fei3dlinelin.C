@@ -42,7 +42,7 @@ namespace oofem {
 double
 FEI3dLineLin :: giveLength(const FEICellGeometry &cellgeo) const
 {
-    return cellgeo.giveVertexCoordinates(2)->distance( * cellgeo.giveVertexCoordinates(1) );
+    return distance(cellgeo.giveVertexCoordinates(2), cellgeo.giveVertexCoordinates(1));
 }
 
 void
@@ -60,7 +60,7 @@ FEI3dLineLin :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const F
 {
     ///@todo Not clear what this function should return. Just dNds would make sense if the caller defines a local coordinate system.
     FloatArray vec;
-    vec.beDifferenceOf( * cellgeo.giveVertexCoordinates(2), * cellgeo.giveVertexCoordinates(1) );
+    vec.beDifferenceOf( cellgeo.giveVertexCoordinates(2), cellgeo.giveVertexCoordinates(1) );
 
     double detJ = vec.computeSquaredNorm() * 0.5;
     double l2_inv = 0.5 / detJ;
@@ -88,8 +88,8 @@ FEI3dLineLin :: local2global(FloatArray &answer, const FloatArray &lcoords, cons
 {
     double ksi = lcoords.at(1);
 
-    answer.beScaled( ( 1. - ksi ) * 0.5, * cellgeo.giveVertexCoordinates(1) );
-    answer.add( ( 1. + ksi ) * 0.5, * cellgeo.giveVertexCoordinates(2) );
+    answer.beScaled( ( 1. - ksi ) * 0.5, cellgeo.giveVertexCoordinates(1) );
+    answer.add( ( 1. + ksi ) * 0.5, cellgeo.giveVertexCoordinates(2) );
 }
 
 
@@ -97,8 +97,8 @@ int
 FEI3dLineLin :: global2local(FloatArray &answer, const FloatArray &coords, const FEICellGeometry &cellgeo)
 {
     FloatArray vec, x;
-    vec.beDifferenceOf( * cellgeo.giveVertexCoordinates(2), * cellgeo.giveVertexCoordinates(1) );
-    x.beDifferenceOf( coords, * cellgeo.giveVertexCoordinates(1) );
+    vec.beDifferenceOf( cellgeo.giveVertexCoordinates(2), cellgeo.giveVertexCoordinates(1) );
+    x.beDifferenceOf( coords, cellgeo.giveVertexCoordinates(1) );
     double l2 = vec.computeSquaredNorm();
     double xvec = x.dotProduct(vec);
 
@@ -200,20 +200,20 @@ FEI3dLineLin :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArr
     jacobianMatrix.at(1, 1) = 1.0;
 }
 
-IntegrationRule *
+std::unique_ptr<IntegrationRule>
 FEI3dLineLin :: giveIntegrationRule(int order)
 {
-    IntegrationRule *iRule = new GaussIntegrationRule(1, NULL);
+    auto iRule = std::make_unique<GaussIntegrationRule>(1, nullptr);
     int points = iRule->getRequiredNumberOfIntegrationPoints(_Line, order + 0);
     iRule->SetUpPointsOnLine(points, _Unknown);
-    return iRule;
+    return std::move(iRule);
 }
 
-IntegrationRule *
+std::unique_ptr<IntegrationRule>
 FEI3dLineLin :: giveBoundaryIntegrationRule(int order, int boundary)
 {
     ///@todo Not sure about this.
     OOFEM_ERROR("Not supported");
-    return NULL;
+    return nullptr;
 }
 } // end namespace oofem

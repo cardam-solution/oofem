@@ -35,9 +35,34 @@
 #include "fei2dquadbiquad.h"
 #include "floatmatrix.h"
 #include "floatarray.h"
+#include "floatarrayf.h"
+#include "floatmatrixf.h"
 #include "gaussintegrationrule.h"
 
 namespace oofem {
+
+FloatArrayF<9>
+FEI2dQuadBiQuad :: evalN(const FloatArrayF<2> &lcoords)
+{
+    double u = lcoords[0];
+    double v = lcoords[1];
+
+    std::array<double, 3> a = {0.5 * ( u - 1.0 ) * u, 1.0 - u * u, 0.5 * ( u + 1.0 ) * u};
+    std::array<double, 3> b = {0.5 * ( v - 1.0 ) * v, 1.0 - v * v, 0.5 * ( v + 1.0 ) * v};
+
+    return {
+        a [ 0 ] * b [ 0 ],
+        a [ 2 ] * b [ 0 ],
+        a [ 2 ] * b [ 2 ],
+        a [ 0 ] * b [ 2 ],
+        a [ 1 ] * b [ 0 ],
+        a [ 2 ] * b [ 1 ],
+        a [ 1 ] * b [ 2 ],
+        a [ 0 ] * b [ 1 ],
+        a [ 1 ] * b [ 1 ],
+    };
+}
+
 void
 FEI2dQuadBiQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
 {
@@ -46,12 +71,8 @@ FEI2dQuadBiQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FE
     u = lcoords.at(1);
     v = lcoords.at(2);
 
-    double a[] = {
-        0.5 * ( u - 1.0 ) * u, 1.0 - u * u, 0.5 * ( u + 1.0 ) * u
-    };
-    double b[] = {
-        0.5 * ( v - 1.0 ) * v, 1.0 - v * v, 0.5 * ( v + 1.0 ) * v
-    };
+    std::array<double, 3> a = {0.5 * ( u - 1.0 ) * u, 1.0 - u * u, 0.5 * ( u + 1.0 ) * u};
+    std::array<double, 3> b = {0.5 * ( v - 1.0 ) * v, 1.0 - v * v, 0.5 * ( v + 1.0 ) * v};
 
     answer.resize(9);
     answer.at(1) = a [ 0 ] * b [ 0 ];
@@ -68,8 +89,43 @@ FEI2dQuadBiQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FE
 }
 
 
+FloatMatrixF<2,9>
+FEI2dQuadBiQuad :: evaldNdxi(const FloatArrayF<2> &lc)
+{
+    double u = lc[0];
+    double v = lc[1];
+
+    std::array<double, 3> a = {0.5 * ( u - 1.0 ) * u, 1.0 - u * u, 0.5 * ( u + 1.0 ) * u};
+    std::array<double, 3> b = {0.5 * ( v - 1.0 ) * v, 1.0 - v * v, 0.5 * ( v + 1.0 ) * v};
+
+    std::array<double, 3> da = {u - 0.5, -2.0 * u, u + 0.5};
+    std::array<double, 3> db = {v - 0.5, -2.0 * v, v + 0.5};
+
+    return {
+        da [ 0 ] * b [ 0 ],
+        a [ 0 ] * db [ 0 ],
+        da [ 2 ] * b [ 0 ],
+        a [ 2 ] * db [ 0 ],
+        da [ 2 ] * b [ 2 ],
+        a [ 2 ] * db [ 2 ],
+        da [ 0 ] * b [ 2 ],
+        a [ 0 ] * db [ 2 ],
+        da [ 1 ] * b [ 0 ],
+        a [ 1 ] * db [ 0 ],
+        da [ 2 ] * b [ 1 ],
+        a [ 2 ] * db [ 1 ],
+        da [ 1 ] * b [ 2 ],
+        a [ 1 ] * db [ 2 ],
+        da [ 0 ] * b [ 1 ],
+        a [ 0 ] * db [ 1 ],
+        da [ 1 ] * b [ 1 ],
+        a [ 1 ] * db [ 1 ],
+    };
+}
+
+
 void
-FEI2dQuadBiQuad :: giveDerivatives(FloatMatrix &dN, const FloatArray &lc)
+FEI2dQuadBiQuad :: evaldNdxi(FloatMatrix &dN, const FloatArray &lc, const FEICellGeometry &cellgeo)
 {
     double u = lc.at(1);
     double v = lc.at(2);
@@ -112,11 +168,32 @@ FEI2dQuadBiQuad :: giveDerivatives(FloatMatrix &dN, const FloatArray &lc)
 }
 
 
-IntegrationRule *FEI2dQuadBiQuad :: giveIntegrationRule(int order)
+std::pair<double, FloatMatrixF<2,9>>
+FEI2dQuadBiQuad :: evaldNdx(const FloatArrayF<2> &lcoords, const FEICellGeometry &cellgeo) const
 {
-    IntegrationRule *iRule = new GaussIntegrationRule(1, NULL);
+    auto dn = evaldNdxi(lcoords);
+    FloatMatrixF<2,2> jacT;
+    for ( int i = 1; i <= dn.cols(); i++ ) {
+        const auto &c = cellgeo.giveVertexCoordinates(i);
+        double x = c.at(xind);
+        double y = c.at(yind);
+
+        ///@todo check transpose
+        jacT(0, 0) += dn.at(1, i) * x;
+        jacT(0, 1) += dn.at(1, i) * y;
+        jacT(1, 0) += dn.at(2, i) * x;
+        jacT(1, 1) += dn.at(2, i) * y;
+    }
+
+    return {det(jacT), dot(inv(jacT), dn)};
+}
+
+
+std::unique_ptr<IntegrationRule> FEI2dQuadBiQuad :: giveIntegrationRule(int order)
+{
+    auto iRule = std::make_unique<GaussIntegrationRule>(1, nullptr);
     int points = iRule->getRequiredNumberOfIntegrationPoints(_Square, order + 6);
     iRule->SetUpPointsOnSquare(points, _Unknown);
-    return iRule;
+    return std::move(iRule);
 }
 } // end namespace oofem

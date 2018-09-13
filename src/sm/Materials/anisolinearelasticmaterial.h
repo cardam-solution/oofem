@@ -45,7 +45,9 @@
 ///@name Input fields for AnisotropicLinearElasticMaterial
 //@{
 #define _IFT_AnisotropicLinearElasticMaterial_Name "anisole"
+/// Stiffness coefficients arranged by rows from the diagonal to the right (21 values)
 #define _IFT_AnisotropicLinearElasticMaterial_stiff "stiff"
+/// Thermal expansion, 6 components in strain-Voigt order,
 #define _IFT_AnisotropicLinearElasticMaterial_talpha "talpha"
 //@}
 
@@ -55,43 +57,18 @@ class GaussPoint;
 /**
  * This class implements a general anisotropic linear elastic material in a finite
  * element problem.
- *
- * Tasks:
- * - Returning standard material stiffness matrix for 3d-case.
- *   according to current state determined by using data stored
- *   in Gausspoint, and local coordinate system defined in gp.
- * - Returning real stress state vector(tensor) at gauss point for 3d - case.
  */
 class AnisotropicLinearElasticMaterial : public LinearElasticMaterial
 {
-protected:
-    FloatMatrix stiffmat;
-    FloatArray alpha;
-
 public:
+    AnisotropicLinearElasticMaterial(int n, Domain *d) : LinearElasticMaterial(n, d) {}
+    virtual ~AnisotropicLinearElasticMaterial() {}
 
-    AnisotropicLinearElasticMaterial(int n, Domain *d) : LinearElasticMaterial(n, d), stiffmat(6,6), alpha(3)
-    {}
-    virtual ~AnisotropicLinearElasticMaterial()
-    {}
+    IRResultType initializeFrom(InputRecord *ir) override;
+    void giveInputRecord(DynamicInputRecord &input) override;
 
-    // identification and auxiliary functions
-    virtual const char *giveInputRecordName() const { return _IFT_AnisotropicLinearElasticMaterial_Name; }
-    virtual const char *giveClassName() const { return "AnisotropicLinearElasticMaterial"; }
-    virtual IRResultType initializeFrom(InputRecord *ir);
-    void giveInputRecord(DynamicInputRecord &input);
-
-    // important functions
-    virtual void give3dMaterialStiffnessMatrix(FloatMatrix &answer,
-                                               MatResponseMode mode, GaussPoint *gp,
-                                               TimeStep *tStep);
-    virtual void giveThermalDilatationVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep);
-
-    virtual MaterialStatus *CreateStatus(GaussPoint *gp) const;
-
-protected:
-
-    friend class CrossSection;
+    const char *giveInputRecordName() const override { return _IFT_AnisotropicLinearElasticMaterial_Name; }
+    const char *giveClassName() const override { return "AnisotropicLinearElasticMaterial"; }
 };
 } // end namespace oofem
 #endif // anisolinearelasticmaterial_h

@@ -55,6 +55,8 @@
 #include "contextioresulttype.h"
 #include "metastep.h"
 #include "parallelcontext.h"
+#include "exportmodulemanager.h"
+#include "initmodulemanager.h"
 
 #ifdef __PARALLEL_MODE
  #include "parallel.h"
@@ -247,9 +249,9 @@ protected:
     int contextOutputStep;
 
     /// Export module manager.
-    ExportModuleManager *exportModuleManager;
+    ExportModuleManager exportModuleManager;
     /// Initialization module manager.
-    InitModuleManager *initModuleManager;
+    InitModuleManager initModuleManager;
 
     /// Domain mode.
     problemMode pMode;
@@ -270,7 +272,7 @@ protected:
     /// Type of non linear formulation (total or updated formulation).
     enum fMode nonLinFormulation;
     /// Error estimator. Useful for adaptivity, or simply printing errors output.
-    ErrorEstimator *defaultErrEstimator;
+    std::unique_ptr<ErrorEstimator> defaultErrEstimator;
 
     /// Domain rank in a group of collaborating processes (0..groupSize-1).
     int rank;
@@ -289,8 +291,8 @@ protected:
     /**@name Load balancing attributes */
     //@{
     /// Load Balancer.
-    LoadBalancer *lb;
-    LoadBalancerMonitor *lbm;
+    std::unique_ptr<LoadBalancer> lb;
+    std::unique_ptr<LoadBalancerMonitor> lbm;
     /// If set to true, load balancing is active.
     bool loadBalancingFlag;
     /// Debug flag forcing load balancing after first step.
@@ -346,9 +348,9 @@ public:
     bool giveSuppressOutput() const { return suppressOutput; }
 
     /** Service for accessing ErrorEstimator corresponding to particular domain */
-    virtual ErrorEstimator *giveDomainErrorEstimator(int n) { return defaultErrEstimator; }
+    virtual ErrorEstimator *giveDomainErrorEstimator(int n) { return defaultErrEstimator.get(); }
     /** Returns material interface representation for given domain */
-    virtual MaterialInterface *giveMaterialInterface(int n) { return NULL; }
+    virtual MaterialInterface *giveMaterialInterface(int n) { return nullptr; }
     void setNumberOfEquations(int id, int neq) {
         numberOfEquations = neq;
         domainNeqs.at(id) = neq;
@@ -648,10 +650,9 @@ public:
      * integration points (and material statuses) are stored.
      * @param stream Context stream.
      * @param mode Determines amount of info in stream.
-     * @return contextIOResultType.
      * @exception ContextIOERR If error encountered.
      */
-    virtual contextIOResultType saveContext(DataStream &stream, ContextMode mode);
+    virtual void saveContext(DataStream &stream, ContextMode mode);
     /**
      * Restores the state of model from output stream. Restores not only the receiver state,
      * but also same function is invoked for all DofManagers and Elements in associated
@@ -664,10 +665,9 @@ public:
      * context.
      * @param stream Context file.
      * @param mode Determines amount of info in stream.
-     * @return contextIOResultType.
      * @exception ContextIOERR exception if error encountered.
      */
-    virtual contextIOResultType restoreContext(DataStream &stream, ContextMode mode);
+    virtual void restoreContext(DataStream &stream, ContextMode mode);
     /**
      * Updates domain links after the domains of receiver have changed. Used mainly after
      * restoring context - the domains may change and this service is then used
@@ -753,9 +753,9 @@ public:
     /// Returns the time step number, when initial conditions should apply.
     int giveNumberOfTimeStepWhenIcApply() { return 0; }
     /// Returns reference to receiver's numerical method.
-    virtual NumericalMethod *giveNumericalMethod(MetaStep *mStep) { return NULL; }
+    virtual NumericalMethod *giveNumericalMethod(MetaStep *mStep) { return nullptr; }
     /// Returns receiver's export module manager.
-    ExportModuleManager *giveExportModuleManager() { return exportModuleManager; }
+    ExportModuleManager *giveExportModuleManager() { return &exportModuleManager; }
     /// Returns reference to receiver timer (EngngModelTimer).
     EngngModelTimer *giveTimer() { return & timer; }
 

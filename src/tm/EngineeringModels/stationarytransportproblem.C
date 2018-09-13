@@ -38,7 +38,6 @@
 #include "element.h"
 #include "dof.h"
 #include "maskedprimaryfield.h"
-#include "intvarfield.h"
 #include "verbose.h"
 #include "tm/Elements/transportelement.h"
 #include "classfactory.h"
@@ -175,8 +174,8 @@ void StationaryTransportProblem :: solveYourselfAt(TimeStep *tStep)
         solutionVector->resize(neq);
         solutionVector->zero();
 
-        conductivityMatrix.reset( classFactory.createSparseMtrx(sparseMtrxType) );
-        if ( conductivityMatrix == NULL ) {
+        conductivityMatrix = classFactory.createSparseMtrx(sparseMtrxType);
+        if ( !conductivityMatrix ) {
             OOFEM_ERROR("sparse matrix creation failed");
         }
 
@@ -281,34 +280,19 @@ StationaryTransportProblem :: updateComponent(TimeStep *tStep, NumericalCmpn cmp
     }
 }
 
-contextIOResultType
+void
 StationaryTransportProblem :: saveContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    if ( ( iores = EngngModel :: saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
+    EngngModel :: saveContext(stream, mode);
     UnknownsField->saveContext(stream);
-
-    return CIO_OK;
 }
 
 
-
-contextIOResultType
+void
 StationaryTransportProblem :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    if ( ( iores = EngngModel :: restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
+    EngngModel :: restoreContext(stream, mode);
     UnknownsField->restoreContext(stream);
-
-    return CIO_OK;
 }
 
 

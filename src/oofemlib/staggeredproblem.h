@@ -140,7 +140,7 @@ public:
     /**
      * Constructor. Creates an engineering model with number i belonging to domain d.
      */
-    StaggeredProblem(int i, EngngModel * _master = NULL);
+    StaggeredProblem(int i, EngngModel * _master=nullptr);
     /// Destructor.
     virtual ~StaggeredProblem();
     StaggeredProblem(const StaggeredProblem &) = delete;
@@ -163,8 +163,8 @@ public:
     IRResultType initializeFrom(InputRecord *ir) override;
     void updateAttributes(MetaStep *mStep) override;
 
-    contextIOResultType saveContext(DataStream &stream, ContextMode mode) override;
-    contextIOResultType restoreContext(DataStream &stream, ContextMode mod) override;
+    void saveContext(DataStream &stream, ContextMode mode) override;
+    void restoreContext(DataStream &stream, ContextMode mode) override;
     void updateDomainLinks() override;
 
     void printYourself();

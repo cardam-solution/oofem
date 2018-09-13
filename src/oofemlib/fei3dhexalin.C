@@ -37,43 +37,171 @@
 #include "floatmatrix.h"
 #include "floatarray.h"
 #include "gaussintegrationrule.h"
+#include "floatarrayf.h"
+#include "floatmatrixf.h"
 
 namespace oofem {
+
+FloatArrayF<8>
+FEI3dHexaLin :: evalN(const FloatArrayF<3> &lcoords)
+{
+    ///auto [x, y, z] = lcoords; // structured bindings C++17 would be nice.
+    double x = lcoords[0];
+    double y = lcoords[1];
+    double z = lcoords[2];
+
+    return {
+        0.125 * ( 1. - x ) * ( 1. - y ) * ( 1. + z ),
+        0.125 * ( 1. - x ) * ( 1. + y ) * ( 1. + z ),
+        0.125 * ( 1. + x ) * ( 1. + y ) * ( 1. + z ),
+        0.125 * ( 1. + x ) * ( 1. - y ) * ( 1. + z ),
+        0.125 * ( 1. - x ) * ( 1. - y ) * ( 1. - z ),
+        0.125 * ( 1. - x ) * ( 1. + y ) * ( 1. - z ),
+        0.125 * ( 1. + x ) * ( 1. + y ) * ( 1. - z ),
+        0.125 * ( 1. + x ) * ( 1. - y ) * ( 1. - z )
+    };
+}
+
+
 void
 FEI3dHexaLin :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
 {
-    double x, y, z;
-    answer.resize(8);
+#if 0
+    answer = evalN(lcoords);
+#else
+    double x = lcoords[0];
+    double y = lcoords[1];
+    double z = lcoords[2];
 
-    x = lcoords.at(1);
-    y = lcoords.at(2);
-    z = lcoords.at(3);
-
-    answer.at(1)  = 0.125 * ( 1. - x ) * ( 1. - y ) * ( 1. + z );
-    answer.at(2)  = 0.125 * ( 1. - x ) * ( 1. + y ) * ( 1. + z );
-    answer.at(3)  = 0.125 * ( 1. + x ) * ( 1. + y ) * ( 1. + z );
-    answer.at(4)  = 0.125 * ( 1. + x ) * ( 1. - y ) * ( 1. + z );
-    answer.at(5)  = 0.125 * ( 1. - x ) * ( 1. - y ) * ( 1. - z );
-    answer.at(6)  = 0.125 * ( 1. - x ) * ( 1. + y ) * ( 1. - z );
-    answer.at(7)  = 0.125 * ( 1. + x ) * ( 1. + y ) * ( 1. - z );
-    answer.at(8)  = 0.125 * ( 1. + x ) * ( 1. - y ) * ( 1. - z );
+    answer = {
+        0.125 * ( 1. - x ) * ( 1. - y ) * ( 1. + z ),
+        0.125 * ( 1. - x ) * ( 1. + y ) * ( 1. + z ),
+        0.125 * ( 1. + x ) * ( 1. + y ) * ( 1. + z ),
+        0.125 * ( 1. + x ) * ( 1. - y ) * ( 1. + z ),
+        0.125 * ( 1. - x ) * ( 1. - y ) * ( 1. - z ),
+        0.125 * ( 1. - x ) * ( 1. + y ) * ( 1. - z ),
+        0.125 * ( 1. + x ) * ( 1. + y ) * ( 1. - z ),
+        0.125 * ( 1. + x ) * ( 1. - y ) * ( 1. - z )
+    };
+#endif
 }
+
+
+FloatMatrixF<3,8>
+FEI3dHexaLin :: evaldNdxi(const FloatArrayF<3> &lcoords)
+{
+    //auto [u, v, w] = lcoords;
+    double u = lcoords.at(1);
+    double v = lcoords.at(2);
+    double w = lcoords.at(3);
+
+    return {
+        -0.125 * ( 1. - v ) * ( 1. + w ),
+        -0.125 * ( 1. - u ) * ( 1. + w ),
+        0.125 * ( 1. - u ) * ( 1. - v ),
+        -0.125 * ( 1. + v ) * ( 1. + w ),
+        0.125 * ( 1. - u ) * ( 1. + w ),
+        0.125 * ( 1. - u ) * ( 1. + v ),
+        0.125 * ( 1. + v ) * ( 1. + w ),
+        0.125 * ( 1. + u ) * ( 1. + w ),
+        0.125 * ( 1. + u ) * ( 1. + v ),
+        0.125 * ( 1. - v ) * ( 1. + w ),
+        -0.125 * ( 1. + u ) * ( 1. + w ),
+        0.125 * ( 1. + u ) * ( 1. - v ),
+        -0.125 * ( 1. - v ) * ( 1. - w ),
+        -0.125 * ( 1. - u ) * ( 1. - w ),
+        -0.125 * ( 1. - u ) * ( 1. - v ),
+        -0.125 * ( 1. + v ) * ( 1. - w ),
+        0.125 * ( 1. - u ) * ( 1. - w ),
+        -0.125 * ( 1. - u ) * ( 1. + v ),
+        0.125 * ( 1. + v ) * ( 1. - w ),
+        0.125 * ( 1. + u ) * ( 1. - w ),
+        -0.125 * ( 1. + u ) * ( 1. + v ),
+        0.125 * ( 1. - v ) * ( 1. - w ),
+        -0.125 * ( 1. + u ) * ( 1. - w ),
+        -0.125 * ( 1. + u ) * ( 1. - v ),
+    };
+}
+
+void
+FEI3dHexaLin :: evaldNdxi(FloatMatrix &dN, const FloatArray &lcoords, const FEICellGeometry &)
+{
+#if 0
+    dN = evaldNdxi(lcoords);
+#else
+    double u, v, w;
+    u = lcoords.at(1);
+    v = lcoords.at(2);
+    w = lcoords.at(3);
+
+    dN.resize(8, 3);
+
+    dN.at(1, 1) = -0.125 * ( 1. - v ) * ( 1. + w );
+    dN.at(2, 1) = -0.125 * ( 1. + v ) * ( 1. + w );
+    dN.at(3, 1) =  0.125 * ( 1. + v ) * ( 1. + w );
+    dN.at(4, 1) =  0.125 * ( 1. - v ) * ( 1. + w );
+    dN.at(5, 1) = -0.125 * ( 1. - v ) * ( 1. - w );
+    dN.at(6, 1) = -0.125 * ( 1. + v ) * ( 1. - w );
+    dN.at(7, 1) =  0.125 * ( 1. + v ) * ( 1. - w );
+    dN.at(8, 1) =  0.125 * ( 1. - v ) * ( 1. - w );
+
+    dN.at(1, 2) = -0.125 * ( 1. - u ) * ( 1. + w );
+    dN.at(2, 2) =  0.125 * ( 1. - u ) * ( 1. + w );
+    dN.at(3, 2) =  0.125 * ( 1. + u ) * ( 1. + w );
+    dN.at(4, 2) = -0.125 * ( 1. + u ) * ( 1. + w );
+    dN.at(5, 2) = -0.125 * ( 1. - u ) * ( 1. - w );
+    dN.at(6, 2) =  0.125 * ( 1. - u ) * ( 1. - w );
+    dN.at(7, 2) =  0.125 * ( 1. + u ) * ( 1. - w );
+    dN.at(8, 2) = -0.125 * ( 1. + u ) * ( 1. - w );
+
+    dN.at(1, 3) =  0.125 * ( 1. - u ) * ( 1. - v );
+    dN.at(2, 3) =  0.125 * ( 1. - u ) * ( 1. + v );
+    dN.at(3, 3) =  0.125 * ( 1. + u ) * ( 1. + v );
+    dN.at(4, 3) =  0.125 * ( 1. + u ) * ( 1. - v );
+    dN.at(5, 3) = -0.125 * ( 1. - u ) * ( 1. - v );
+    dN.at(6, 3) = -0.125 * ( 1. - u ) * ( 1. + v );
+    dN.at(7, 3) = -0.125 * ( 1. + u ) * ( 1. + v );
+    dN.at(8, 3) = -0.125 * ( 1. + u ) * ( 1. - v );
+#endif
+}
+
+
+std::pair<double, FloatMatrixF<3,8>>
+FEI3dHexaLin :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry &cellgeo)
+{
+    auto dNduvw = evaldNdxi(lcoords);
+    FloatMatrixF<3,8> coords;
+    for ( int i = 0; i < 8; i++ ) {
+        ///@todo cellgeo should give a FloatArrayF<3>, this will add a "costly" construction now:
+        coords.setColumn(cellgeo.giveVertexCoordinates(i+1), i);
+    }
+    auto jacT = dotT(dNduvw, coords);
+    return {det(jacT), dot(inv(jacT), dNduvw)};
+}
+
 
 double
 FEI3dHexaLin :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
 {
+#if 0
+    auto tmp = evaldNdx(lcoords, cellgeo);
+    //auto [det, dndx] = evaldNdx(lcoords, cellgeo);
+    answer = tmp.second;
+    return tmp.first;
+#else
     FloatMatrix jacobianMatrix, inv, dNduvw, coords;
 
-    this->giveLocalDerivative(dNduvw, lcoords);
+    this->evaldNdxi(dNduvw, lcoords, cellgeo);
     coords.resize(3, 8);
     for ( int i = 1; i <= 8; i++ ) {
-        coords.setColumn(* cellgeo.giveVertexCoordinates(i), i);
+        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
     }
     jacobianMatrix.beProductOf(coords, dNduvw);
     inv.beInverseOf(jacobianMatrix);
 
     answer.beProductOf(dNduvw, inv);
     return jacobianMatrix.giveDeterminant();
+#endif
 }
 
 void
@@ -84,7 +212,7 @@ FEI3dHexaLin :: local2global(FloatArray &answer, const FloatArray &lcoords, cons
 
     answer.clear();
     for ( int i = 1; i <= 8; i++ ) {
-        answer.add( n.at(i), * cellgeo.giveVertexCoordinates(i) );
+        answer.add( n.at(i), cellgeo.giveVertexCoordinates(i) );
     }
 }
 
@@ -101,32 +229,32 @@ FEI3dHexaLin :: global2local(FloatArray &answer, const FloatArray &coords, const
     FloatArray r(3), delta;
     int nite = 0;
 
-    x1 = cellgeo.giveVertexCoordinates(1)->at(1);
-    x2 = cellgeo.giveVertexCoordinates(2)->at(1);
-    x3 = cellgeo.giveVertexCoordinates(3)->at(1);
-    x4 = cellgeo.giveVertexCoordinates(4)->at(1);
-    x5 = cellgeo.giveVertexCoordinates(5)->at(1);
-    x6 = cellgeo.giveVertexCoordinates(6)->at(1);
-    x7 = cellgeo.giveVertexCoordinates(7)->at(1);
-    x8 = cellgeo.giveVertexCoordinates(8)->at(1);
+    x1 = cellgeo.giveVertexCoordinates(1).at(1);
+    x2 = cellgeo.giveVertexCoordinates(2).at(1);
+    x3 = cellgeo.giveVertexCoordinates(3).at(1);
+    x4 = cellgeo.giveVertexCoordinates(4).at(1);
+    x5 = cellgeo.giveVertexCoordinates(5).at(1);
+    x6 = cellgeo.giveVertexCoordinates(6).at(1);
+    x7 = cellgeo.giveVertexCoordinates(7).at(1);
+    x8 = cellgeo.giveVertexCoordinates(8).at(1);
 
-    y1 = cellgeo.giveVertexCoordinates(1)->at(2);
-    y2 = cellgeo.giveVertexCoordinates(2)->at(2);
-    y3 = cellgeo.giveVertexCoordinates(3)->at(2);
-    y4 = cellgeo.giveVertexCoordinates(4)->at(2);
-    y5 = cellgeo.giveVertexCoordinates(5)->at(2);
-    y6 = cellgeo.giveVertexCoordinates(6)->at(2);
-    y7 = cellgeo.giveVertexCoordinates(7)->at(2);
-    y8 = cellgeo.giveVertexCoordinates(8)->at(2);
+    y1 = cellgeo.giveVertexCoordinates(1).at(2);
+    y2 = cellgeo.giveVertexCoordinates(2).at(2);
+    y3 = cellgeo.giveVertexCoordinates(3).at(2);
+    y4 = cellgeo.giveVertexCoordinates(4).at(2);
+    y5 = cellgeo.giveVertexCoordinates(5).at(2);
+    y6 = cellgeo.giveVertexCoordinates(6).at(2);
+    y7 = cellgeo.giveVertexCoordinates(7).at(2);
+    y8 = cellgeo.giveVertexCoordinates(8).at(2);
 
-    z1 = cellgeo.giveVertexCoordinates(1)->at(3);
-    z2 = cellgeo.giveVertexCoordinates(2)->at(3);
-    z3 = cellgeo.giveVertexCoordinates(3)->at(3);
-    z4 = cellgeo.giveVertexCoordinates(4)->at(3);
-    z5 = cellgeo.giveVertexCoordinates(5)->at(3);
-    z6 = cellgeo.giveVertexCoordinates(6)->at(3);
-    z7 = cellgeo.giveVertexCoordinates(7)->at(3);
-    z8 = cellgeo.giveVertexCoordinates(8)->at(3);
+    z1 = cellgeo.giveVertexCoordinates(1).at(3);
+    z2 = cellgeo.giveVertexCoordinates(2).at(3);
+    z3 = cellgeo.giveVertexCoordinates(3).at(3);
+    z4 = cellgeo.giveVertexCoordinates(4).at(3);
+    z5 = cellgeo.giveVertexCoordinates(5).at(3);
+    z6 = cellgeo.giveVertexCoordinates(6).at(3);
+    z7 = cellgeo.giveVertexCoordinates(7).at(3);
+    z8 = cellgeo.giveVertexCoordinates(8).at(3);
 
     xp = coords.at(1);
     yp = coords.at(2);
@@ -262,12 +390,12 @@ FEI3dHexaLin :: edgeLocal2global(FloatArray &answer, int iedge,
     this->edgeEvalN(n, iedge, lcoords, cellgeo);
 
     answer.resize(3);
-    answer.at(1) = ( n.at(1) * cellgeo.giveVertexCoordinates( edgeNodes.at(1) )->at(1) +
-                    n.at(2) * cellgeo.giveVertexCoordinates( edgeNodes.at(2) )->at(1) );
-    answer.at(2) = ( n.at(1) * cellgeo.giveVertexCoordinates( edgeNodes.at(1) )->at(2) +
-                    n.at(2) * cellgeo.giveVertexCoordinates( edgeNodes.at(2) )->at(2) );
-    answer.at(3) = ( n.at(1) * cellgeo.giveVertexCoordinates( edgeNodes.at(1) )->at(3) +
-                    n.at(2) * cellgeo.giveVertexCoordinates( edgeNodes.at(2) )->at(3) );
+    answer.at(1) = n.at(1) * cellgeo.giveVertexCoordinates( edgeNodes.at(1) ).at(1) +
+                   n.at(2) * cellgeo.giveVertexCoordinates( edgeNodes.at(2) ).at(1);
+    answer.at(2) = n.at(1) * cellgeo.giveVertexCoordinates( edgeNodes.at(1) ).at(2) +
+                   n.at(2) * cellgeo.giveVertexCoordinates( edgeNodes.at(2) ).at(2);
+    answer.at(3) = n.at(1) * cellgeo.giveVertexCoordinates( edgeNodes.at(1) ).at(3) +
+                   n.at(2) * cellgeo.giveVertexCoordinates( edgeNodes.at(2) ).at(3);
 }
 
 
@@ -331,18 +459,16 @@ FEI3dHexaLin :: computeLocalEdgeMapping(IntArray &edgeNodes, int iedge)
 double
 FEI3dHexaLin :: edgeComputeLength(IntArray &edgeNodes, const FEICellGeometry &cellgeo)
 {
-    return cellgeo.giveVertexCoordinates( edgeNodes.at(2) )->distance( cellgeo.giveVertexCoordinates( edgeNodes.at(1) ) );
+    return distance(cellgeo.giveVertexCoordinates( edgeNodes.at(2) ), cellgeo.giveVertexCoordinates( edgeNodes.at(1) ));
 }
 
 void
 FEI3dHexaLin :: surfaceEvalN(FloatArray &answer, int isurf, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
 {
-    double ksi, eta;
+    double ksi = lcoords.at(1);
+    double eta = lcoords.at(2);
+
     answer.resize(4);
-
-    ksi = lcoords.at(1);
-    eta = lcoords.at(2);
-
     answer.at(1) = ( 1. + ksi ) * ( 1. + eta ) * 0.25;
     answer.at(2) = ( 1. - ksi ) * ( 1. + eta ) * 0.25;
     answer.at(3) = ( 1. - ksi ) * ( 1. - eta ) * 0.25;
@@ -415,25 +541,24 @@ FEI3dHexaLin :: surfaceLocal2global(FloatArray &answer, int iedge,
     this->surfaceEvalN(n, iedge, lcoords, cellgeo);
 
     answer.resize(3);
-    answer.at(1) = n.at(1) * cellgeo.giveVertexCoordinates( nodes.at(1) )->at(1) + n.at(2) * cellgeo.giveVertexCoordinates( nodes.at(2) )->at(1) +
-    n.at(3) * cellgeo.giveVertexCoordinates( nodes.at(3) )->at(1) + n.at(4) * cellgeo.giveVertexCoordinates( nodes.at(4) )->at(1);
-    answer.at(2) = n.at(1) * cellgeo.giveVertexCoordinates( nodes.at(1) )->at(2) + n.at(2) * cellgeo.giveVertexCoordinates( nodes.at(2) )->at(2) +
-    n.at(3) * cellgeo.giveVertexCoordinates( nodes.at(3) )->at(2) + n.at(4) * cellgeo.giveVertexCoordinates( nodes.at(4) )->at(2);
-    answer.at(3) = n.at(1) * cellgeo.giveVertexCoordinates( nodes.at(1) )->at(3) + n.at(2) * cellgeo.giveVertexCoordinates( nodes.at(2) )->at(3) +
-    n.at(3) * cellgeo.giveVertexCoordinates( nodes.at(3) )->at(3) + n.at(4) * cellgeo.giveVertexCoordinates( nodes.at(4) )->at(3);
+    answer.at(1) = n.at(1) * cellgeo.giveVertexCoordinates( nodes.at(1) ).at(1) + n.at(2) * cellgeo.giveVertexCoordinates( nodes.at(2) ).at(1) +
+                   n.at(3) * cellgeo.giveVertexCoordinates( nodes.at(3) ).at(1) + n.at(4) * cellgeo.giveVertexCoordinates( nodes.at(4) ).at(1);
+    answer.at(2) = n.at(1) * cellgeo.giveVertexCoordinates( nodes.at(1) ).at(2) + n.at(2) * cellgeo.giveVertexCoordinates( nodes.at(2) ).at(2) +
+                   n.at(3) * cellgeo.giveVertexCoordinates( nodes.at(3) ).at(2) + n.at(4) * cellgeo.giveVertexCoordinates( nodes.at(4) ).at(2);
+    answer.at(3) = n.at(1) * cellgeo.giveVertexCoordinates( nodes.at(1) ).at(3) + n.at(2) * cellgeo.giveVertexCoordinates( nodes.at(2) ).at(3) +
+                   n.at(3) * cellgeo.giveVertexCoordinates( nodes.at(3) ).at(3) + n.at(4) * cellgeo.giveVertexCoordinates( nodes.at(4) ).at(3);
 }
 
 double
 FEI3dHexaLin :: surfaceEvalNormal(FloatArray &answer, int isurf, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
 {
     FloatArray a, b, dNdksi(4), dNdeta(4);
-    double ksi, eta;
     IntArray snodes;
 
     this->computeLocalSurfaceMapping(snodes, isurf);
 
-    ksi = lcoords.at(1);
-    eta = lcoords.at(2);
+    double ksi = lcoords.at(1);
+    double eta = lcoords.at(2);
 
     // No need to divide by 1/4, we'll normalize anyway;
     dNdksi.at(1) =  ( 1. + eta );
@@ -447,8 +572,8 @@ FEI3dHexaLin :: surfaceEvalNormal(FloatArray &answer, int isurf, const FloatArra
     dNdeta.at(4) = -( 1. + ksi );
 
     for ( int i = 1; i <= 4; ++i ) {
-        a.add( dNdksi.at(i), * cellgeo.giveVertexCoordinates( snodes.at(i) ) );
-        b.add( dNdeta.at(i), * cellgeo.giveVertexCoordinates( snodes.at(i) ) );
+        a.add( dNdksi.at(i), cellgeo.giveVertexCoordinates( snodes.at(i) ) );
+        b.add( dNdeta.at(i), cellgeo.giveVertexCoordinates( snodes.at(i) ) );
     }
 
     answer.beVectorProductOf(a, b);
@@ -488,51 +613,14 @@ FEI3dHexaLin :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArr
 // Returns the jacobian matrix  J (x,y,z)/(ksi,eta,dzeta)  of the receiver.
 {
     FloatMatrix dNduvw, coords;
-    this->giveLocalDerivative(dNduvw, lcoords);
+    this->evaldNdxi(dNduvw, lcoords, cellgeo);
     coords.resize(3, 8);
     for ( int i = 1; i <= 8; i++ ) {
-        coords.setColumn(* cellgeo.giveVertexCoordinates(i), i);
+        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
     }
     jacobianMatrix.beProductOf(coords, dNduvw);
 }
 
-void
-FEI3dHexaLin :: giveLocalDerivative(FloatMatrix &dN, const FloatArray &lcoords)
-{
-    double u, v, w;
-    u = lcoords.at(1);
-    v = lcoords.at(2);
-    w = lcoords.at(3);
-
-    dN.resize(8, 3);
-
-    dN.at(1, 1) = -0.125 * ( 1. - v ) * ( 1. + w );
-    dN.at(2, 1) = -0.125 * ( 1. + v ) * ( 1. + w );
-    dN.at(3, 1) =  0.125 * ( 1. + v ) * ( 1. + w );
-    dN.at(4, 1) =  0.125 * ( 1. - v ) * ( 1. + w );
-    dN.at(5, 1) = -0.125 * ( 1. - v ) * ( 1. - w );
-    dN.at(6, 1) = -0.125 * ( 1. + v ) * ( 1. - w );
-    dN.at(7, 1) =  0.125 * ( 1. + v ) * ( 1. - w );
-    dN.at(8, 1) =  0.125 * ( 1. - v ) * ( 1. - w );
-
-    dN.at(1, 2) = -0.125 * ( 1. - u ) * ( 1. + w );
-    dN.at(2, 2) =  0.125 * ( 1. - u ) * ( 1. + w );
-    dN.at(3, 2) =  0.125 * ( 1. + u ) * ( 1. + w );
-    dN.at(4, 2) = -0.125 * ( 1. + u ) * ( 1. + w );
-    dN.at(5, 2) = -0.125 * ( 1. - u ) * ( 1. - w );
-    dN.at(6, 2) =  0.125 * ( 1. - u ) * ( 1. - w );
-    dN.at(7, 2) =  0.125 * ( 1. + u ) * ( 1. - w );
-    dN.at(8, 2) = -0.125 * ( 1. + u ) * ( 1. - w );
-
-    dN.at(1, 3) =  0.125 * ( 1. - u ) * ( 1. - v );
-    dN.at(2, 3) =  0.125 * ( 1. - u ) * ( 1. + v );
-    dN.at(3, 3) =  0.125 * ( 1. + u ) * ( 1. + v );
-    dN.at(4, 3) =  0.125 * ( 1. + u ) * ( 1. - v );
-    dN.at(5, 3) = -0.125 * ( 1. - u ) * ( 1. - v );
-    dN.at(6, 3) = -0.125 * ( 1. - u ) * ( 1. + v );
-    dN.at(7, 3) = -0.125 * ( 1. + u ) * ( 1. + v );
-    dN.at(8, 3) = -0.125 * ( 1. + u ) * ( 1. - v );
-}
 
 double
 FEI3dHexaLin :: evalNXIntegral(int iEdge, const FEICellGeometry &cellgeo)
@@ -540,33 +628,33 @@ FEI3dHexaLin :: evalNXIntegral(int iEdge, const FEICellGeometry &cellgeo)
     IntArray fNodes;
     this->computeLocalSurfaceMapping(fNodes, iEdge);
 
-    const FloatArray &c1 = * cellgeo.giveVertexCoordinates( fNodes.at(1) );
-    const FloatArray &c2 = * cellgeo.giveVertexCoordinates( fNodes.at(2) );
-    const FloatArray &c3 = * cellgeo.giveVertexCoordinates( fNodes.at(3) );
-    const FloatArray &c4 = * cellgeo.giveVertexCoordinates( fNodes.at(4) );
+    const FloatArray &c1 = cellgeo.giveVertexCoordinates( fNodes.at(1) );
+    const FloatArray &c2 = cellgeo.giveVertexCoordinates( fNodes.at(2) );
+    const FloatArray &c3 = cellgeo.giveVertexCoordinates( fNodes.at(3) );
+    const FloatArray &c4 = cellgeo.giveVertexCoordinates( fNodes.at(4) );
 
     return (
-               c4(2) * ( c1(1) * ( -c2(0) - c3(0) ) + c2(1) * ( c1(0) - c3(0) ) + c3(1) * ( c1(0) + c2(0) ) ) +
-               c3(2) * ( c1(1) * ( -c2(0) + c4(0) ) + c2(1) * ( c1(0) + c4(0) ) +                          c4(1) * ( -c1(0) - c2(0) ) ) +
-               c2(2) * ( c1(1) * ( c3(0) + c4(0) ) +                          c3(1) * ( -c1(0) - c4(0) ) + c4(1) * ( -c1(0) + c3(0) ) ) +
-               c1(2) * ( c2(1) * ( -c3(0) - c4(0) ) + c3(1) * ( c2(0) - c4(0) ) + c4(1) * ( c2(0) + c3(0) ) ) ) * 0.25;
+        c4(2) * ( c1(1) * ( -c2(0) - c3(0) ) + c2(1) * ( c1(0) - c3(0) ) + c3(1) * ( c1(0) + c2(0) ) ) +
+        c3(2) * ( c1(1) * ( -c2(0) + c4(0) ) + c2(1) * ( c1(0) + c4(0) ) +                          c4(1) * ( -c1(0) - c2(0) ) ) +
+        c2(2) * ( c1(1) * ( c3(0) + c4(0) ) +                          c3(1) * ( -c1(0) - c4(0) ) + c4(1) * ( -c1(0) + c3(0) ) ) +
+        c1(2) * ( c2(1) * ( -c3(0) - c4(0) ) + c3(1) * ( c2(0) - c4(0) ) + c4(1) * ( c2(0) + c3(0) ) ) ) * 0.25;
 }
 
-IntegrationRule *
+std::unique_ptr<IntegrationRule>
 FEI3dHexaLin :: giveIntegrationRule(int order)
 {
-    IntegrationRule *iRule = new GaussIntegrationRule(1, NULL);
+    auto iRule = std::make_unique<GaussIntegrationRule>(1, nullptr);
     int points = iRule->getRequiredNumberOfIntegrationPoints(_Cube, order + 6);
     iRule->SetUpPointsOnCube(points, _Unknown);
-    return iRule;
+    return std::move(iRule);
 }
 
-IntegrationRule *
+std::unique_ptr<IntegrationRule>
 FEI3dHexaLin :: giveBoundaryIntegrationRule(int order, int boundary)
 {
-    IntegrationRule *iRule = new GaussIntegrationRule(1, NULL);
+    auto iRule = std::make_unique<GaussIntegrationRule>(1, nullptr);
     int points = iRule->getRequiredNumberOfIntegrationPoints(_Square, order + 2);
     iRule->SetUpPointsOnSquare(points, _Unknown);
-    return iRule;
+    return std::move(iRule);
 }
 } // end namespace oofem

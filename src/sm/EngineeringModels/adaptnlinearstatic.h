@@ -96,7 +96,7 @@ protected:
     FloatArray timeStepLoadLevels;
 
 public:
-    AdaptiveNonLinearStatic(int i, EngngModel * _master = NULL);
+    AdaptiveNonLinearStatic(int i, EngngModel *master = nullptr);
     virtual ~AdaptiveNonLinearStatic();
 
     void solveYourselfAt(TimeStep *tStep) override;
@@ -128,13 +128,13 @@ public:
      */
     virtual int adaptiveRemap(Domain *dNew);
 
-    contextIOResultType saveContext(DataStream &stream, ContextMode mode) override;
-    contextIOResultType restoreContext(DataStream &stream, ContextMode mode) override;
+    void saveContext(DataStream &stream, ContextMode mode) override;
+    void restoreContext(DataStream &stream, ContextMode mode) override;
 
     void updateDomainLinks() override;
 
     const char *giveClassName() const override { return "AdaptiveNonLinearStatic"; }
-    const char *giveInputRecordName() const { return _IFT_AdaptiveNonLinearStatic_Name; }
+    const char *giveInputRecordName() const override { return _IFT_AdaptiveNonLinearStatic_Name; }
 
 #ifdef __PARALLEL_MODE
     LoadBalancer *giveLoadBalancer() override;

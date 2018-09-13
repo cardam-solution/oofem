@@ -36,6 +36,8 @@
 #include "mathfem.h"
 #include "floatmatrix.h"
 #include "floatarray.h"
+#include "floatarrayf.h"
+#include "floatmatrixf.h"
 #include "gaussintegrationrule.h"
 
 namespace oofem {
@@ -48,25 +50,25 @@ FEI3dTetQuad :: giveVolume(const FEICellGeometry &cellgeo) const
     double y1, y2, y3, y4;     //, y5, y6, y7, y8, y9, y10;
     double z1, z2, z3, z4;     //, z5, z6, z7, z8, z9, z10;
 
-    x1 = cellgeo.giveVertexCoordinates(1)->at(1);
-    y1 = cellgeo.giveVertexCoordinates(1)->at(2);
-    z1 = cellgeo.giveVertexCoordinates(1)->at(3);
-    x2 = cellgeo.giveVertexCoordinates(2)->at(1);
-    y2 = cellgeo.giveVertexCoordinates(2)->at(2);
-    z2 = cellgeo.giveVertexCoordinates(2)->at(3);
-    x3 = cellgeo.giveVertexCoordinates(3)->at(1);
-    y3 = cellgeo.giveVertexCoordinates(3)->at(2);
-    z3 = cellgeo.giveVertexCoordinates(3)->at(3);
-    x4 = cellgeo.giveVertexCoordinates(4)->at(1);
-    y4 = cellgeo.giveVertexCoordinates(4)->at(2);
-    z4 = cellgeo.giveVertexCoordinates(4)->at(3);
+    x1 = cellgeo.giveVertexCoordinates(1).at(1);
+    y1 = cellgeo.giveVertexCoordinates(1).at(2);
+    z1 = cellgeo.giveVertexCoordinates(1).at(3);
+    x2 = cellgeo.giveVertexCoordinates(2).at(1);
+    y2 = cellgeo.giveVertexCoordinates(2).at(2);
+    z2 = cellgeo.giveVertexCoordinates(2).at(3);
+    x3 = cellgeo.giveVertexCoordinates(3).at(1);
+    y3 = cellgeo.giveVertexCoordinates(3).at(2);
+    z3 = cellgeo.giveVertexCoordinates(3).at(3);
+    x4 = cellgeo.giveVertexCoordinates(4).at(1);
+    y4 = cellgeo.giveVertexCoordinates(4).at(2);
+    z4 = cellgeo.giveVertexCoordinates(4).at(3);
 #if 0
-    x5=cellgeo.giveVertexCoordinates(5)->at(1);     y5=cellgeo.giveVertexCoordinates(5)->at(2);     z5=cellgeo.giveVertexCoordinates(5)->at(3);
-    x6=cellgeo.giveVertexCoordinates(6)->at(1);     y6=cellgeo.giveVertexCoordinates(6)->at(2);     z6=cellgeo.giveVertexCoordinates(6)->at(3);
-    x7=cellgeo.giveVertexCoordinates(7)->at(1);     y7=cellgeo.giveVertexCoordinates(7)->at(2);     z7=cellgeo.giveVertexCoordinates(7)->at(3);
-    x8=cellgeo.giveVertexCoordinates(8)->at(1);     y8=cellgeo.giveVertexCoordinates(8)->at(2);     z8=cellgeo.giveVertexCoordinates(8)->at(3);
-    x9=cellgeo.giveVertexCoordinates(9)->at(1);     y9=cellgeo.giveVertexCoordinates(9)->at(2);     z9=cellgeo.giveVertexCoordinates(9)->at(3);
-    x10=cellgeo.giveVertexCoordinates(10)->at(1);   y10=cellgeo.giveVertexCoordinates(10)->at(2);   z10=cellgeo.giveVertexCoordinates(10)->at(3);
+    x5=cellgeo.giveVertexCoordinates(5).at(1);     y5=cellgeo.giveVertexCoordinates(5).at(2);     z5=cellgeo.giveVertexCoordinates(5).at(3);
+    x6=cellgeo.giveVertexCoordinates(6).at(1);     y6=cellgeo.giveVertexCoordinates(6).at(2);     z6=cellgeo.giveVertexCoordinates(6).at(3);
+    x7=cellgeo.giveVertexCoordinates(7).at(1);     y7=cellgeo.giveVertexCoordinates(7).at(2);     z7=cellgeo.giveVertexCoordinates(7).at(3);
+    x8=cellgeo.giveVertexCoordinates(8).at(1);     y8=cellgeo.giveVertexCoordinates(8).at(2);     z8=cellgeo.giveVertexCoordinates(8).at(3);
+    x9=cellgeo.giveVertexCoordinates(9).at(1);     y9=cellgeo.giveVertexCoordinates(9).at(2);     z9=cellgeo.giveVertexCoordinates(9).at(3);
+    x10=cellgeo.giveVertexCoordinates(10).at(1);   y10=cellgeo.giveVertexCoordinates(10).at(2);   z10=cellgeo.giveVertexCoordinates(10).at(3);
 
     double area = x1*y3*z2 - x1*y2*z3 + x2*y1*z3 - x2*y3*z1 - x3*y1*z2 + x3*y2*z1 + x1*y2*z4 - x1*y4*z2 - x2*y1*z4 + x2*y4*z1 + x4*y1*z2 - x4*y2*z1 - x1*y3*z4 + x1*y4*z3
      + x3*y1*z4 - x3*y4*z1 - x4*y1*z3 + x4*y3*z1 - 2*x1*y2*z6 + 2*x1*y3*z5 - 2*x1*y5*z3 + 2*x1*y6*z2 + 2*x2*y1*z6 + x2*y3*z4 - x2*y4*z3 - 2*x2*y6*z1 - 2*x3*y1*z5 - x3*y2*z4
@@ -121,9 +123,35 @@ FEI3dTetQuad :: giveVolume(const FEICellGeometry &cellgeo) const
     return area;
 }
 
+FloatArrayF<10>
+FEI3dTetQuad :: evalN(const FloatArrayF<3> &lcoords)
+{
+    //auto [x1,x2,x3] = lcoords;
+    double x1 = lcoords[0];
+    double x2 = lcoords[1];
+    double x3 = lcoords[2];
+    double x4 = 1.0 - x1 - x2 - x3;
+
+    return {
+        x1 * ( 2 * x1 - 1 ),
+        x2 * ( 2 * x2 - 1 ),
+        x3 * ( 2 * x3 - 1 ),
+        x4 * ( 2 * x4 - 1 ),
+        4 * x1 * x2,
+        4 * x2 * x3,
+        4 * x3 * x1,
+        4 * x1 * x4,
+        4 * x2 * x4,
+        4 * x3 * x4
+    };
+}
+
 void
 FEI3dTetQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
 {
+#if 0
+    answer = evalN(lcoords);
+#else
     double x1 = lcoords[0];
     double x2 = lcoords[1];
     double x3 = lcoords[2];
@@ -141,27 +169,92 @@ FEI3dTetQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICe
     answer[7] = 4 * x1 * x4;
     answer[8] = 4 * x2 * x4;
     answer[9] = 4 * x3 * x4;
+#endif
+}
+
+std::pair<double, FloatMatrixF<3,10>>
+FEI3dTetQuad :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry &cellgeo)
+{
+    auto dNduvw = evaldNdxi(lcoords);
+    FloatMatrixF<3,10> coords;
+    for ( int i = 0; i < 10; i++ ) {
+        ///@todo cellgeo should give a FloatArrayF<3>, this will add a "costly" construction now:
+        coords.setColumn(cellgeo.giveVertexCoordinates(i+1), i);
+    }
+    auto jacT = dotT(dNduvw, coords);
+    return {det(jacT), dot(inv(jacT), dNduvw)};
 }
 
 double
 FEI3dTetQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
 {
+#if 0
+    auto tmp = evaldNdx(lcoords, cellgeo);
+    answer = tmp.second;
+    return tmp.first;
+#else
     FloatMatrix jacobianMatrix, inv, dNduvw, coords;
     this->evaldNdxi(dNduvw, lcoords, cellgeo);
     coords.resize( 3, dNduvw.giveNumberOfRows() );
     for ( int i = 1; i <= dNduvw.giveNumberOfRows(); i++ ) {
-        coords.setColumn(* cellgeo.giveVertexCoordinates(i), i);
+        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
     }
     jacobianMatrix.beProductOf(coords, dNduvw);
     inv.beInverseOf(jacobianMatrix);
 
     answer.beProductOf(dNduvw, inv);
     return jacobianMatrix.giveDeterminant();
+#endif
+}
+
+FloatMatrixF<3,10>
+FEI3dTetQuad :: evaldNdxi(const FloatArrayF<3> &lcoords)
+{
+    double x1 = lcoords[0];
+    double x2 = lcoords[1];
+    double x3 = lcoords[2];
+    double x4 = 1.0 - x1 - x2 - x3;
+
+    return {
+        4. * x1 - 1, // 1
+        0.,
+        0.,
+        0., // 2
+        4. * x2 - 1,
+        0.,
+        0., // 3
+        0.,
+        4. * x3 - 1,
+        -4. * x4 + 1, // 4
+        -4. * x4 + 1,
+        -4. * x4 + 1,
+        4. * x2, // 5
+        4. * x1,
+        0.,
+        0., // 6
+        4. * x3,
+        4. * x2,
+        4. * x3, // 7
+        0.,
+        4. * x1,
+        4. * ( x4 - x1 ), // 8
+        -4. * x1,
+        -4. * x1,
+        -4. * x2, // 9
+        4. * ( x4 - x2 ),
+        -4. * x2,
+        -4. * x3, // 10
+        -4. * x3,
+        4. * ( x4 - x3 )
+    };
 }
 
 void
 FEI3dTetQuad :: evaldNdxi(FloatMatrix &answer, const FloatArray &lcoords , const FEICellGeometry &cellgeo)
 {
+#if 0
+    answer = evaldNdxi(lcoords);
+#else
     double x1 = lcoords[0];
     double x2 = lcoords[1];
     double x3 = lcoords[2];
@@ -204,6 +297,7 @@ FEI3dTetQuad :: evaldNdxi(FloatMatrix &answer, const FloatArray &lcoords , const
     answer(7, 2) = -4 * x1;
     answer(8, 2) = -4 * x2;
     answer(9, 2) = 4 * ( x4 - x3 );
+#endif
 }
 
 
@@ -214,7 +308,7 @@ FEI3dTetQuad :: local2global(FloatArray &answer, const FloatArray &lcoords, cons
     this->evalN(N, lcoords, cellgeo);
     answer.clear();
     for ( int i = 1; i <= N.giveSize(); i++ ) {
-        answer.add( N.at(i), * cellgeo.giveVertexCoordinates(i) );
+        answer.add( N.at(i), cellgeo.giveVertexCoordinates(i) );
     }
 }
 
@@ -286,7 +380,7 @@ FEI3dTetQuad :: global2local(FloatArray &answer, const FloatArray &gcoords, cons
 double
 FEI3dTetQuad :: giveCharacteristicLength(const FEICellGeometry &cellgeo) const
 {
-    return cellgeo.giveVertexCoordinates(1)->distance( cellgeo.giveVertexCoordinates(2) );
+    return distance(cellgeo.giveVertexCoordinates(1), cellgeo.giveVertexCoordinates(2));
 }
 
 
@@ -297,7 +391,7 @@ FEI3dTetQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArr
     this->evaldNdxi(dNduvw, lcoords, cellgeo);
     coords.resize( 3, dNduvw.giveNumberOfRows() );
     for ( int i = 1; i <= dNduvw.giveNumberOfRows(); i++ ) {
-        coords.setColumn(* cellgeo.giveVertexCoordinates(i), i);
+        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
     }
     jacobianMatrix.beProductOf(coords, dNduvw);
 }
@@ -334,7 +428,7 @@ FEI3dTetQuad :: edgeLocal2global(FloatArray &answer, int iedge,
 
     answer.clear();
     for ( int i = 0; i < N.giveSize(); ++i ) {
-        answer.add( N[i], * cellgeo.giveVertexCoordinates( edgeNodes[i] ) );
+        answer.add( N[i], cellgeo.giveVertexCoordinates( edgeNodes[i] ) );
     }
 }
 
@@ -420,7 +514,7 @@ FEI3dTetQuad :: surfaceLocal2global(FloatArray &answer, int isurf,
 
     answer.clear();
     for ( int i = 0; i < N.giveSize(); ++i ) {
-        answer.add( N[i], * cellgeo.giveVertexCoordinates( nodes[i] ) );
+        answer.add( N[i], cellgeo.giveVertexCoordinates( nodes[i] ) );
     }
 }
 
@@ -474,8 +568,8 @@ FEI3dTetQuad :: surfaceEvalNormal(FloatArray &answer, int isurf, const FloatArra
     dNdeta[5] = -4.0 * l1;
 
     for ( int i = 0; i < 6; ++i ) {
-        a.add( dNdxi[i],  * cellgeo.giveVertexCoordinates( snodes[i] ) );
-        b.add( dNdeta[i], * cellgeo.giveVertexCoordinates( snodes[i] ) );
+        a.add( dNdxi[i],  cellgeo.giveVertexCoordinates( snodes[i] ) );
+        b.add( dNdeta[i], cellgeo.giveVertexCoordinates( snodes[i] ) );
     }
     answer.beVectorProductOf(a, b);
     return answer.normalize();
@@ -540,12 +634,12 @@ double FEI3dTetQuad :: evalNXIntegral(int iEdge, const FEICellGeometry &cellgeo)
     IntArray fNodes;
     this->computeLocalSurfaceMapping(fNodes, iEdge);
 
-    const FloatArray &c1 = * cellgeo.giveVertexCoordinates( fNodes.at(1) );
-    const FloatArray &c2 = * cellgeo.giveVertexCoordinates( fNodes.at(2) );
-    const FloatArray &c3 = * cellgeo.giveVertexCoordinates( fNodes.at(3) );
-    const FloatArray &c4 = * cellgeo.giveVertexCoordinates( fNodes.at(4) );
-    const FloatArray &c5 = * cellgeo.giveVertexCoordinates( fNodes.at(5) );
-    const FloatArray &c6 = * cellgeo.giveVertexCoordinates( fNodes.at(6) );
+    const FloatArray &c1 = cellgeo.giveVertexCoordinates( fNodes.at(1) );
+    const FloatArray &c2 = cellgeo.giveVertexCoordinates( fNodes.at(2) );
+    const FloatArray &c3 = cellgeo.giveVertexCoordinates( fNodes.at(3) );
+    const FloatArray &c4 = cellgeo.giveVertexCoordinates( fNodes.at(4) );
+    const FloatArray &c5 = cellgeo.giveVertexCoordinates( fNodes.at(5) );
+    const FloatArray &c6 = cellgeo.giveVertexCoordinates( fNodes.at(6) );
 
     // Expression derived in Mathematica:
     return (
@@ -582,21 +676,21 @@ double FEI3dTetQuad :: evalNXIntegral(int iEdge, const FEICellGeometry &cellgeo)
                ) / 30.;
 }
 
-IntegrationRule *
+std::unique_ptr<IntegrationRule>
 FEI3dTetQuad :: giveIntegrationRule(int order)
 {
-    IntegrationRule *iRule = new GaussIntegrationRule(1, NULL);
+    auto iRule = std::make_unique<GaussIntegrationRule>(1, nullptr);
     int points = iRule->getRequiredNumberOfIntegrationPoints(_Tetrahedra, order + 3);
     iRule->SetUpPointsOnTetrahedra(points, _Unknown);
-    return iRule;
+    return std::move(iRule);
 }
 
-IntegrationRule *
+std::unique_ptr<IntegrationRule>
 FEI3dTetQuad :: giveBoundaryIntegrationRule(int order, int boundary)
 {
-    IntegrationRule *iRule = new GaussIntegrationRule(1, NULL);
+    auto iRule = std::make_unique<GaussIntegrationRule>(1, nullptr);
     int points = iRule->getRequiredNumberOfIntegrationPoints(_Triangle, order + 2);
     iRule->SetUpPointsOnTriangle(points, _Unknown);
-    return iRule;
+    return std::move(iRule);
 }
 } // end namespace oofem

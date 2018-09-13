@@ -66,11 +66,7 @@ const double EnrichmentItem :: mLevelSetRelTol = 1.0e-3;
 
 
 EnrichmentItem :: EnrichmentItem(int n, XfemManager *xMan, Domain *aDomain) : FEMComponent(n, aDomain),
-    mpEnrichmentFunc(NULL),
-    mpEnrichmentFrontStart(NULL),
-    mpEnrichmentFrontEnd(NULL),
     mEnrFrontIndex(0),
-    mpPropagationLaw(NULL),
     mPropLawIndex(0),
     mInheritBoundaryConditions(false),
     mInheritOrderedBoundaryConditions(false),
@@ -83,10 +79,6 @@ EnrichmentItem :: EnrichmentItem(int n, XfemManager *xMan, Domain *aDomain) : FE
 
 EnrichmentItem :: ~EnrichmentItem()
 {
-    delete mpEnrichmentFunc;
-    delete mpEnrichmentFrontStart;
-    delete mpEnrichmentFrontEnd;
-    delete mpPropagationLaw;
 }
 
 IRResultType EnrichmentItem :: initializeFrom(InputRecord *ir)
@@ -122,11 +114,11 @@ EnrichmentItem :: giveNumberOfEnrDofs() const
 {
     int numEnrDofs = mpEnrichmentFunc->giveNumberOfDofs();
 
-    if ( mpEnrichmentFrontStart != NULL ) {
+    if ( mpEnrichmentFrontStart ) {
         numEnrDofs = max( numEnrDofs, mpEnrichmentFrontStart->giveMaxNumEnrichments() );
     }
 
-    if ( mpEnrichmentFrontEnd != NULL ) {
+    if ( mpEnrichmentFrontEnd ) {
         numEnrDofs = max( numEnrDofs, mpEnrichmentFrontEnd->giveMaxNumEnrichments() );
     }
 
@@ -146,7 +138,7 @@ bool EnrichmentItem :: isElementEnriched(const Element *element) const
 
 int EnrichmentItem :: giveNumDofManEnrichments(const DofManager &iDMan) const
 {
-    int nodeInd     = iDMan.giveGlobalNumber();
+    int nodeInd = iDMan.giveGlobalNumber();
     auto res = mNodeEnrMarkerMap.find(nodeInd);
 
     if ( res != mNodeEnrMarkerMap.end() ) {
@@ -184,7 +176,7 @@ bool EnrichmentItem :: isMaterialModified(GaussPoint &iGP, Element &iEl, CrossSe
 
 bool EnrichmentItem :: hasPropagatingFronts() const
 {
-    if ( mpPropagationLaw == NULL ) {
+    if ( mpPropagationLaw == nullptr ) {
         return false;
     }
 
@@ -301,21 +293,21 @@ void EnrichmentItem :: createEnrichedDofs()
         if ( isDofManEnriched(* dMan) ) {
             //printf("dofMan %i is enriched \n", dMan->giveNumber());
             computeEnrichedDofManDofIdArray(EnrDofIdArray, * dMan);
-            
+
             // Collect boundary condition ID of existing dofs
             IntArray bcIndexArray;
             for ( Dof *dof: *dMan ) {
                 bcIndexArray.followedBy(dof->giveBcId());
-            }    
-            
+            }
+
             bool foundBC = false;
             IntArray nonZeroBC;
             if ( !bcIndexArray.containsOnlyZeroes() ) {
                 // BC is found on dofs  
                 foundBC = true;
                 nonZeroBC.findNonzeros(bcIndexArray);
-            }             
-            
+            }
+
             int iDof(1);
             for ( auto &dofid: EnrDofIdArray ) {
                 if ( !dMan->hasDofID( ( DofIDItem ) ( dofid ) ) ) {
@@ -354,7 +346,7 @@ void EnrichmentItem :: createEnrichedDofs()
 
         computeEnrichedDofManDofIdArray(EnrDofIdArray, * dMan);
         std :: vector< DofIDItem >dofsToRemove;
-        for ( Dof *dof: *dMan ) {
+        for ( auto &dof: *dMan ) {
             DofIDItem dofID = dof->giveDofID();
 
             if ( dofID >= DofIDItem(poolStart) && dofID <= DofIDItem(poolEnd) ) {
@@ -412,7 +404,7 @@ void EnrichmentItem :: calcPolarCoord(double &oR, double &oTheta, const FloatArr
     const double tol = 1.0e-20;
 
     // Compute polar coordinates
-    oR = iOrigin.distance(iPos);
+    oR = distance(iOrigin, iPos);
 
     if ( oR > tol ) {
         q.times(1.0 / oR);
@@ -463,14 +455,10 @@ void EnrichmentItem :: calcPolarCoord(double &oR, double &oTheta, const FloatArr
     }
 }
 
-void EnrichmentItem :: setPropagationLaw(PropagationLaw *ipPropagationLaw)
+void EnrichmentItem :: setPropagationLaw(std::unique_ptr<PropagationLaw> ipPropagationLaw)
 {
-	if(mpPropagationLaw != NULL) {
-		delete mpPropagationLaw;
-	}
-
-	mpPropagationLaw = ipPropagationLaw;
-	mPropLawIndex = 1;
+    mpPropagationLaw = std::move(ipPropagationLaw);
+    mPropLawIndex = 1;
 }
 
 void EnrichmentItem :: callGnuplotExportModule(GnuplotExportModule &iExpMod, TimeStep *tStep)
@@ -478,22 +466,22 @@ void EnrichmentItem :: callGnuplotExportModule(GnuplotExportModule &iExpMod, Tim
     //iExpMod.outputXFEM(*this);
 }
 
-void EnrichmentItem :: setEnrichmentFrontStart(EnrichmentFront *ipEnrichmentFrontStart, bool iDeleteOld)
+void EnrichmentItem :: setEnrichmentFrontStart(std::unique_ptr<EnrichmentFront> ipEnrichmentFrontStart, bool iDeleteOld)
 {
-	if(iDeleteOld) {
-		delete mpEnrichmentFrontStart;
-	}
+    if( ! iDeleteOld ) {
+        mpEnrichmentFrontStart.release(); ///@note This is bad bad code
+    }
 
-    mpEnrichmentFrontStart = ipEnrichmentFrontStart;
+    mpEnrichmentFrontStart = std::move(ipEnrichmentFrontStart);
 }
 
-void EnrichmentItem :: setEnrichmentFrontEnd(EnrichmentFront *ipEnrichmentFrontEnd, bool iDeleteOld)
+void EnrichmentItem :: setEnrichmentFrontEnd(std::unique_ptr<EnrichmentFront> ipEnrichmentFrontEnd, bool iDeleteOld)
 {
-	if(iDeleteOld) {
-		delete mpEnrichmentFrontEnd;
-	}
+    if ( !iDeleteOld ) {
+        mpEnrichmentFrontEnd.release(); ///@note This is bad bad code
+    }
 
-    mpEnrichmentFrontEnd = ipEnrichmentFrontEnd;
+    mpEnrichmentFrontEnd = std::move(ipEnrichmentFrontEnd);
 }
 
 bool EnrichmentItem :: tipIsTouchingEI(const TipInfo &iTipInfo)
@@ -502,7 +490,7 @@ bool EnrichmentItem :: tipIsTouchingEI(const TipInfo &iTipInfo)
     SpatialLocalizer *localizer = giveDomain()->giveSpatialLocalizer();
 
     Element *tipEl = localizer->giveElementContainingPoint(iTipInfo.mGlobalCoord);
-    if ( tipEl != NULL ) {
+    if ( tipEl ) {
         // Check if the candidate tip is located on the current crack
         FloatArray N;
         FloatArray locCoord;

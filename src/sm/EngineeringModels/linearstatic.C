@@ -73,10 +73,10 @@ NumericalMethod *LinearStatic :: giveNumericalMethod(MetaStep *mStep)
     if ( !nMethod ) {
         if ( isParallel() ) {
             if ( ( solverType == ST_Petsc ) || ( solverType == ST_Feti ) ) {
-                nMethod.reset( classFactory.createSparseLinSolver(solverType, this->giveDomain(1), this) );
+                nMethod = classFactory.createSparseLinSolver(solverType, this->giveDomain(1), this);
             }
         } else {
-            nMethod.reset( classFactory.createSparseLinSolver(solverType, this->giveDomain(1), this) );
+            nMethod = classFactory.createSparseLinSolver(solverType, this->giveDomain(1), this);
         }
         if ( !nMethod ) {
             OOFEM_ERROR("linear solver creation failed for lstype %d", solverType);
@@ -198,7 +198,7 @@ void LinearStatic :: solveYourselfAt(TimeStep *tStep)
         //
         // first step  assemble stiffness Matrix
         //
-        stiffnessMatrix.reset( classFactory.createSparseMtrx(sparseMtrxType) );
+        stiffnessMatrix = classFactory.createSparseMtrx(sparseMtrxType);
         if ( !stiffnessMatrix ) {
             OOFEM_ERROR("sparse matrix creation failed");
         }
@@ -261,35 +261,25 @@ void LinearStatic :: solveYourselfAt(TimeStep *tStep)
 }
 
 
-contextIOResultType LinearStatic :: saveContext(DataStream &stream, ContextMode mode)
+void LinearStatic :: saveContext(DataStream &stream, ContextMode mode)
 {
+    StructuralEngngModel :: saveContext(stream, mode);
+
     contextIOResultType iores;
-
-    if ( ( iores = StructuralEngngModel :: saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
     if ( ( iores = displacementVector.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
 
-contextIOResultType LinearStatic :: restoreContext(DataStream &stream, ContextMode mode)
+void LinearStatic :: restoreContext(DataStream &stream, ContextMode mode)
 {
+    StructuralEngngModel :: restoreContext(stream, mode);
+
     contextIOResultType iores;
-
-    if ( ( iores = StructuralEngngModel :: restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
     if ( ( iores = displacementVector.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
 

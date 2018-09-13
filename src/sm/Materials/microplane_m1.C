@@ -90,9 +90,7 @@ M1Material :: giveRealStressVector_3d(FloatArray &answer,
     FloatArray sigN(numberOfMicroplanes);
     IntArray plState(numberOfMicroplanes);
     for ( int imp = 1; imp <= numberOfMicroplanes; imp++ ) {
-        Microplane *mPlane = this->giveMicroplane(imp - 1, gp);
-        //IntegrationPointStatus *mPlaneStatus =  this->giveMicroplaneStatus(mPlane);
-        double epsN = computeNormalStrainComponent(mPlane, totalStrain);
+        double epsN = computeNormalStrainComponent(imp, totalStrain);
         // evaluate trial stress on the microplane
         double sigTrial = EN * ( epsN - epspN.at(imp) );
         // evaluate the yield stress (from total microplane strain, not from its plastic part)
@@ -236,17 +234,16 @@ M1MaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep)
 {
     StructuralMaterialStatus :: printOutputAt(file, tStep);
     fprintf(file, "status { sigN ");
-    int nm = sigN.giveSize();
-    for ( int imp = 1; imp <= nm; imp++ ) {
-        fprintf( file, " %g ", sigN.at(imp) );
+    for ( auto v : sigN ) {
+        fprintf( file, " %g ", v );
     }
     fprintf(file, " epspN ");
-    for ( int imp = 1; imp <= nm; imp++ ) {
-        fprintf( file, " %g ", epspN.at(imp) );
+    for ( auto v : epspN ) {
+        fprintf( file, " %g ", v );
     }
     fprintf(file, " plast ");
-    for ( int imp = 1; imp <= nm; imp++ ) {
-        fprintf( file, " %d ", plasticState.at(imp) );
+    for ( auto v : plasticState ) {
+        fprintf( file, " %d ", v );
     }
     fprintf(file, "}\n");
 }
@@ -259,16 +256,18 @@ M1MaterialStatus :: updateYourself(TimeStep *tStep)
     StructuralMaterialStatus :: updateYourself(tStep);
 }
 
-contextIOResultType
-M1MaterialStatus :: saveContext(DataStream &stream, ContextMode mode, void *obj)
+void
+M1MaterialStatus :: saveContext(DataStream &stream, ContextMode mode)
 {
-    return StructuralMaterialStatus :: saveContext(stream, mode, obj);
+    StructuralMaterialStatus :: saveContext(stream, mode);
+    ///@todo All fields
 }
 
-contextIOResultType
-M1MaterialStatus :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
+void
+M1MaterialStatus :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    return StructuralMaterialStatus :: restoreContext(stream, mode, obj);
+    StructuralMaterialStatus :: restoreContext(stream, mode);
+    ///@todo All fields
 }
 
 #else
@@ -493,16 +492,16 @@ M1MaterialStatus :: updateYourself(TimeStep *tStep)
     StructuralMaterialStatus :: updateYourself(tStep);
 }
 
-contextIOResultType
-M1MaterialStatus :: saveContext(DataStream &stream, ContextMode mode, void *obj)
+void
+M1MaterialStatus :: saveContext(DataStream &stream, ContextMode mode)
 {
-    return StructuralMaterialStatus :: saveContext(stream, mode, obj);
+    StructuralMaterialStatus :: saveContext(stream, mode);
 }
 
-contextIOResultType
-M1MaterialStatus :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
+void
+M1MaterialStatus :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    return StructuralMaterialStatus :: restoreContext(stream, mode, obj);
+    StructuralMaterialStatus :: restoreContext(stream, mode);
 }
 
 #endif // end of old implementation

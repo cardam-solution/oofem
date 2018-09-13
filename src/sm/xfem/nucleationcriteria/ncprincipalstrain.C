@@ -186,10 +186,10 @@ std::vector<std::unique_ptr<EnrichmentItem>> NCPrincipalStrain::nucleateEnrichme
 								}
 
 								for(const auto &x: center_coord_inserted_cracks) {
-									if( x.distance(pc) <  2.0*mInitialCrackLength) {
+									if( distance(x, pc) <  2.0*mInitialCrackLength) {
 										insertionAllowed = false;
-										break;
 										printf("Preventing insertion.\n");
+										break;
 									}
 								}
 
@@ -206,31 +206,23 @@ std::vector<std::unique_ptr<EnrichmentItem>> NCPrincipalStrain::nucleateEnrichme
 									crack->setGeometry(std::move(geom));
 
 									// Enrichment function
-									EnrichmentFunction *ef = new HeavisideFunction(1, mpDomain);
-									crack->setEnrichmentFunction(ef);
+                                    crack->setEnrichmentFunction(std::make_unique<HeavisideFunction>(1, mpDomain));
 
 									// Enrichment fronts
-//									EnrichmentFront *efStart = new EnrFrontLinearBranchFuncOneEl();
-									EnrichmentFront *efStart = new EnrFrontCohesiveBranchFuncOneEl();
-									crack->setEnrichmentFrontStart(efStart);
+                                    crack->setEnrichmentFrontStart(std::make_unique<EnrFrontCohesiveBranchFuncOneEl>());
 
-//									EnrichmentFront *efEnd = new EnrFrontLinearBranchFuncOneEl();
-									EnrichmentFront *efEnd = new EnrFrontCohesiveBranchFuncOneEl();
-									crack->setEnrichmentFrontEnd(efEnd);
-
-
-
+                                    crack->setEnrichmentFrontEnd(std::make_unique<EnrFrontCohesiveBranchFuncOneEl>());
 
 									///////////////////////////////////////
 									// Propagation law
 
 									// Options
-									PLPrincipalStrain *pl = new PLPrincipalStrain();
+									auto pl = std::make_unique<PLPrincipalStrain>();
 									pl->setRadius(0.1*mIncrementLength);
 									pl->setIncrementLength(mIncrementLength);
 									pl->setStrainThreshold(mPropStrainThreshold);
 
-									crack->setPropagationLaw(pl);
+									crack->setPropagationLaw(std::move(pl));
 
 									crack->updateDofIdPool();
 
@@ -276,7 +268,7 @@ IRResultType NCPrincipalStrain::initializeFrom(InputRecord *ir) {
 
 void NCPrincipalStrain :: appendInputRecords(DynamicDataReader &oDR)
 {
-    DynamicInputRecord *ir = new DynamicInputRecord();
+    auto ir = std::make_unique<DynamicInputRecord>();
 
     ir->setRecordKeywordField( this->giveInputRecordName(), 1 );
 
@@ -285,12 +277,12 @@ void NCPrincipalStrain :: appendInputRecords(DynamicDataReader &oDR)
     ir->setField(mIncrementLength, _IFT_NCPrincipalStrain_IncrementLength);
     ir->setField(mPropStrainThreshold, _IFT_NCPrincipalStrain_PropStrainThreshold);
 
-    oDR.insertInputRecord(DataReader :: IR_crackNucleationRec, ir);
+    oDR.insertInputRecord(DataReader :: IR_crackNucleationRec, std::move(ir));
 
     // Enrichment function
-    DynamicInputRecord *efRec = new DynamicInputRecord();
+    auto efRec = std::make_unique<DynamicInputRecord>();
     mpEnrichmentFunc->giveInputRecord(* efRec);
-    oDR.insertInputRecord(DataReader :: IR_enrichFuncRec, efRec);
+    oDR.insertInputRecord(DataReader :: IR_enrichFuncRec, std::move(efRec));
 }
 
 } /* namespace oofem */

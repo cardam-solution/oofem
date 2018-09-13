@@ -225,7 +225,7 @@ SUPG :: ~SUPG()
 NumericalMethod *SUPG :: giveNumericalMethod(MetaStep *mStep)
 {
     if ( !this->nMethod ) {
-        this->nMethod.reset( classFactory.createSparseLinSolver(solverType, this->giveDomain(1), this) ); 
+        this->nMethod = classFactory.createSparseLinSolver(solverType, this->giveDomain(1), this);
         if ( !this->nMethod ) { 
             OOFEM_ERROR("linear solver creation failed for lstype %d", solverType);
         }
@@ -512,7 +512,7 @@ SUPG :: solveYourselfAt(TimeStep *tStep)
 
         incrementalSolutionVector.resize(neq);
 
-        lhs.reset( classFactory.createSparseMtrx(sparseMtrxType) );
+        lhs = classFactory.createSparseMtrx(sparseMtrxType);
         if ( !lhs ) {
             OOFEM_ERROR("sparse matrix creation failed");
         }
@@ -833,53 +833,39 @@ SUPG :: updateInternalState(TimeStep *tStep)
 }
 
 
-contextIOResultType
+void
 SUPG :: saveContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    if ( ( iores = EngngModel :: saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
+    EngngModel :: saveContext(stream, mode);
 
     VelocityPressureField->saveContext(stream);
 
+    contextIOResultType iores;
     if ( ( iores = accelerationVector.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
 
     if ( materialInterface ) {
-        if ( ( iores = materialInterface->saveContext(stream, mode) ) != CIO_OK ) {
-            THROW_CIOERR(iores);
-        }
+        materialInterface->saveContext(stream, mode);
     }
-
-    return CIO_OK;
 }
 
 
-contextIOResultType
+void
 SUPG :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    if ( ( iores = EngngModel :: restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
+    EngngModel :: restoreContext(stream, mode);
 
     VelocityPressureField->restoreContext(stream);
 
+    contextIOResultType iores;
     if ( ( iores = accelerationVector.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
 
     if ( materialInterface ) {
-        if ( ( iores = materialInterface->restoreContext(stream, mode) ) != CIO_OK ) {
-            THROW_CIOERR(iores);
-        }
+        materialInterface->restoreContext(stream, mode);
     }
-
-    return CIO_OK;
 }
 
 

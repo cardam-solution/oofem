@@ -479,7 +479,7 @@ double FloatArray :: distance_square(const FloatArray &from) const
     double dist = 0.;
     int s = min(this->giveSize(), from.giveSize());
     for ( int i = 1; i <= s; ++i ) {
-        double dx = this->at(i) - from.at(i); ///@todo This isn't a distance to "from"?!
+        double dx = this->at(i) - from.at(i);
         dist += dx * dx;
     }
 
@@ -921,10 +921,46 @@ double dot(const FloatArray &x, const FloatArray &y)
     return x.dotProduct(y);
 }
 
+double distance(const FloatArray &x, const FloatArray &y)
+{
+    return x.distance(y);
+}
+
+double distance_square(const FloatArray &x, const FloatArray &y)
+{
+    return x.distance_square(y);
+}
+
 double norm(const FloatArray &x)
 {
     return x.computeNorm();
 }
+
+double norm_square(const FloatArray &x)
+{
+    return x.computeSquaredNorm();
+}
+
+bool isfinite(const FloatArray &x)
+{
+    return x.isFinite();
+}
+
+bool iszero(const FloatArray &x)
+{
+    return x.containsOnlyZeroes();
+}
+
+double sum(const FloatArray & x)
+{
+    return x.sum();
+}
+
+double product(const FloatArray & x)
+{
+    return x.product();
+}
+
 
 // End of IML compat
 

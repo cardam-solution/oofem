@@ -82,12 +82,11 @@ LEPlicElementInterface :: isBoundary()
 }
 
 
-contextIOResultType
-LEPlicElementInterface :: saveContext(DataStream &stream, ContextMode mode, void *obj)
+void
+LEPlicElementInterface :: saveContext(DataStream &stream, ContextMode mode)
 {
     contextIOResultType iores;
 
-    // write a raw data
     if ( !stream.write(vof) ) {
         THROW_CIOERR(CIO_IOERR);
     }
@@ -99,16 +98,13 @@ LEPlicElementInterface :: saveContext(DataStream &stream, ContextMode mode, void
     if ( ( iores = normal.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
-contextIOResultType
-LEPlicElementInterface :: restoreContext(DataStream &stream, ContextMode mode, void *obj)
+void
+LEPlicElementInterface :: restoreContext(DataStream &stream, ContextMode mode)
 {
     contextIOResultType iores;
 
-    // read raw data
     if ( !stream.read(vof) ) {
         THROW_CIOERR(CIO_IOERR);
     }
@@ -124,10 +120,7 @@ LEPlicElementInterface :: restoreContext(DataStream &stream, ContextMode mode, v
     }
 
     temp_normal = normal;
-    return CIO_OK;
 }
-
-
 
 
 
@@ -159,13 +152,11 @@ void
 LEPlic :: doLagrangianPhase(TimeStep *tStep)
 {
     //Maps element nodes along trajectories using basic Runge-Kutta method (midpoint rule)
-    int i, ci, ndofman = domain->giveNumberOfDofManagers();
+    int ci, ndofman = domain->giveNumberOfDofManagers();
     int nsd = 2;
     double dt = tStep->giveTimeIncrement();
-    DofManager *dman;
-    Node *inode;
     IntArray velocityMask;
-    FloatArray x, x2(nsd), v_t, v_tn1;
+    FloatArray x2(nsd), v_t, v_tn1;
     FloatMatrix t;
 #if 1
     EngngModel *emodel = domain->giveEngngModel();
@@ -177,16 +168,16 @@ LEPlic :: doLagrangianPhase(TimeStep *tStep)
     updated_YCoords.resize(ndofman);
 
 
-    for ( i = 1; i <= ndofman; i++ ) {
-        dman = domain->giveDofManager(i);
-        inode = dynamic_cast< Node * >(dman);
+    for ( int i = 1; i <= ndofman; i++ ) {
+        DofManager *dman = domain->giveDofManager(i);
+        Node *inode = dynamic_cast< Node * >(dman);
         // skip dofmanagers with no position information
         if ( !inode ) {
             continue;
         }
 
         // get node coordinates
-        x = * ( inode->giveCoordinates() );
+        const auto &x = * ( inode->giveCoordinates() );
         // get velocity field v(tn, x(tn)) for dof manager
 
 #if 1
@@ -203,9 +194,8 @@ LEPlic :: doLagrangianPhase(TimeStep *tStep)
 
         // compute interpolated velocity field at x2 [ v(tn+1, x(tn)+0.5*dt*v(tn,x(tn))) = v(tn+1, x2) ]
 
-        FieldPtr vfield;
-        vfield = emodel->giveContext()->giveFieldManager()->giveField(FT_Velocity);
-        if ( vfield == NULL ) {
+        FieldPtr vfield = emodel->giveContext()->giveFieldManager()->giveField(FT_Velocity);
+        if ( !vfield ) {
             OOFEM_ERROR("Velocity field not available");
         }
 
@@ -219,7 +209,7 @@ LEPlic :: doLagrangianPhase(TimeStep *tStep)
 
         // compute final updated position
         for ( ci = 1; ci <= nsd; ci++ ) {
-            x2.at(ci) = x.at(ci) + dt *v_tn1.at(ci);
+            x2.at(ci) = x.at(ci) + dt * v_tn1.at(ci);
         }
 
 #else
@@ -494,7 +484,7 @@ LEPlic :: doCellDLS(FloatArray &fvgrad, int ie, bool coord_upd, bool vof_temp_fl
                     }
 
                     ineghbrInterface->giveElementCenter(this, xk, coord_upd);
-                    wk = xk.distance(xi);
+                    wk = distance(xk, xi);
                     dx = ( xk.at(1) - xi.at(1) ) / wk;
                     dy = ( xk.at(2) - xi.at(2) ) / wk;
                     lhs.at(1, 1) += dx * dx;

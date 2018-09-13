@@ -327,16 +327,16 @@ void PrescribedGradientBCNeumann :: integrateTangent(FloatMatrix &oTangent, Elem
     std :: unique_ptr< IntegrationRule > ir;
 
     XfemElementInterface *xfemElInt = dynamic_cast< XfemElementInterface * >( e );
-    if ( xfemElInt != NULL && domain->hasXfemManager() ) {
+    if ( xfemElInt && domain->hasXfemManager() ) {
         IntArray edgeNodes;
         FEInterpolation2d *interp2d = dynamic_cast< FEInterpolation2d * >( interp );
-        if ( interp2d == NULL ) {
+        if ( !interp2d ) {
             OOFEM_ERROR("failed to cast to FEInterpolation2d.")
         }
         interp2d->computeLocalEdgeMapping(edgeNodes, iBndIndex);
 
-//        const FloatArray &xS = * ( e->giveDofManager( edgeNodes.at(1) )->giveCoordinates() );
-//        const FloatArray &xE = * ( e->giveDofManager( edgeNodes.at( edgeNodes.giveSize() ) )->giveCoordinates() );
+//        const auto &xS = * ( e->giveDofManager( edgeNodes.at(1) )->giveCoordinates() );
+//        const auto &xE = * ( e->giveDofManager( edgeNodes.at( edgeNodes.giveSize() ) )->giveCoordinates() );
 
         std :: vector< Line >segments;
         std :: vector< FloatArray >intersecPoints;
@@ -346,7 +346,7 @@ void PrescribedGradientBCNeumann :: integrateTangent(FloatMatrix &oTangent, Elem
         int numPointsPerSeg = 1;
         ir->SetUpPointsOnLine(numPointsPerSeg, matMode);
     } else {
-        ir.reset( interp->giveBoundaryIntegrationRule(order, iBndIndex) );
+        ir = interp->giveBoundaryIntegrationRule(order, iBndIndex);
     }
 
     oTangent.clear();

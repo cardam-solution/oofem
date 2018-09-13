@@ -47,16 +47,16 @@ public:
     MaxwellChainMaterialStatus(int n, Domain * d, GaussPoint * g, int nunits);
     virtual ~MaxwellChainMaterialStatus() { }
 
-    virtual void printOutputAt(FILE *file, TimeStep *tStep);
+    void printOutputAt(FILE *file, TimeStep *tStep) override;
 
-    virtual void initTempStatus();
-    virtual void updateYourself(TimeStep *tStep);
+    void initTempStatus() override;
+    void updateYourself(TimeStep *tStep) override;
 
-    virtual contextIOResultType saveContext(DataStream &stream, ContextMode mode, void *obj = NULL);
-    virtual contextIOResultType restoreContext(DataStream &stream, ContextMode mode, void *obj = NULL);
+    void saveContext(DataStream &stream, ContextMode mode) override;
+    void restoreContext(DataStream &stream, ContextMode mode) override;
 
     // definition
-    virtual const char *giveClassName() const { return "MaxwellChainMaterialStatus"; }
+    const char *giveClassName() const override { return "MaxwellChainMaterialStatus"; }
 };
 
 
@@ -72,27 +72,26 @@ public:
     virtual ~MaxwellChainMaterial() { }
 
     // overload thesse function such that computation of hidden vars can be done after the computation of stress
-    virtual void giveRealStressVector(FloatArray &answer, GaussPoint *gp, const FloatArray &reducedStrain, TimeStep *tStep);
+    void giveRealStressVector(FloatArray &answer, GaussPoint *gp, const FloatArray &reducedStrain, TimeStep *tStep) override;
     void computeHiddenVars(GaussPoint *gp, TimeStep *tStep);
 
     // identification and auxiliary functions
-    virtual int hasNonLinearBehaviour() { return 0; }
-    virtual const char *giveClassName() const { return "MaxwellChainMaterial"; }
-    virtual IRResultType initializeFrom(InputRecord *ir);
+    const char *giveClassName() const override { return "MaxwellChainMaterial"; }
+    IRResultType initializeFrom(InputRecord *ir) override;
 
-    virtual void giveShrinkageStrainVector(FloatArray &answer,
-                                           GaussPoint *gp,
-                                           TimeStep *tStep,
-                                           ValueModeType mode)
+    void giveShrinkageStrainVector(FloatArray &answer,
+                                   GaussPoint *gp,
+                                   TimeStep *tStep,
+                                   ValueModeType mode) override
     { answer.clear(); }
 
-    virtual void giveEigenStrainVector(FloatArray &answer,
-                                       GaussPoint *gp, TimeStep *tStep, ValueModeType mode);
+    void giveEigenStrainVector(FloatArray &answer,
+                               GaussPoint *gp, TimeStep *tStep, ValueModeType mode) override;
 
-    virtual MaterialStatus *CreateStatus(GaussPoint *gp) const;
+    MaterialStatus *CreateStatus(GaussPoint *gp) const override;
 
 protected:
-    virtual int hasIncrementalShrinkageFormulation() { return 0; }
+    int hasIncrementalShrinkageFormulation() override { return 0; }
     /**
      * This function computes the moduli of individual Maxwell units
      * such that the corresponding Dirichlet series gives the best
@@ -107,9 +106,9 @@ protected:
      * @param[out] answer Array with coefficients
      * @param tStep Age of material when load is applied ???
      */
-    virtual void computeCharCoefficients(FloatArray &answer, double tPrime, GaussPoint *gp, TimeStep *tStep);
+    void computeCharCoefficients(FloatArray &answer, double tPrime, GaussPoint *gp, TimeStep *tStep) override;
 
-    virtual double giveEModulus(GaussPoint *gp, TimeStep *tStep);
+    double giveEModulus(GaussPoint *gp, TimeStep *tStep) override;
     LinearElasticMaterial *giveLinearElasticMaterial();
 };
 } // end namespace oofem

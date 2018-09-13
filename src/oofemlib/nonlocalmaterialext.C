@@ -88,8 +88,6 @@ NonlocalMaterialExtensionInterface :: NonlocalMaterialExtensionInterface(Domain 
     averType = 0;
 
     gridSize = 0;
-    grid = NULL;
-    minDist2 = NULL;
     initDiag = 0.;
     order = 1;
     centDiff = 2;
@@ -309,7 +307,7 @@ NonlocalMaterialExtensionInterface :: modifyNonlocalWeightFunctionAround(GaussPo
 #endif
 
     // Compute the "speed" at each grid node, depending on damage or a similar variable (note that "speed" will be deleted by grid)
-    FloatMatrix *speed = grid->givePrescribedField();
+    FloatMatrix &speed = grid->givePrescribedField();
     // This is a simple initialization that leads to standard Euclidean distance
     /*
      * for (i=1; i<=2*gridSize+1; i++)
@@ -342,7 +340,7 @@ NonlocalMaterialExtensionInterface :: modifyNonlocalWeightFunctionAround(GaussPo
             for ( int i = 1; i <= 2 * gridSize + 1; i++ ) {
                 for ( int j = 1; j <= 2 * gridSize + 1; j++ ) {
                     minDist2->at(i, j) = dist2FromGridNode(xngp, yngp, j, i);
-                    speed->at(i, j) = damgp;
+                    speed.at(i, j) = damgp;
                 }
             }
             // For the other neighbors, check whether distance is smaller and update damage
@@ -352,7 +350,7 @@ NonlocalMaterialExtensionInterface :: modifyNonlocalWeightFunctionAround(GaussPo
                     double dist2 = dist2FromGridNode(xngp, yngp, j, i);
                     if ( dist2 < minDist2->at(i, j) ) {
                         minDist2->at(i, j) = dist2;
-                        speed->at(i, j) = damgp;
+                        speed.at(i, j) = damgp;
                     }
                 }
             }
@@ -362,7 +360,7 @@ NonlocalMaterialExtensionInterface :: modifyNonlocalWeightFunctionAround(GaussPo
     // Transform damage to speed
     for ( int i = 1; i <= 2 * gridSize + 1; i++ ) {
         for ( int j = 1; j <= 2 * gridSize + 1; j++ ) {
-            speed->at(i, j) = 1. / computeDistanceModifier( speed->at(i, j) );
+            speed.at(i, j) = 1. / computeDistanceModifier( speed.at(i, j) );
         }
     }
 
@@ -442,17 +440,16 @@ NonlocalMaterialExtensionInterface :: modifyNonlocalWeightFunction_1D_Around(Gau
     elem->computeGlobalCoordinates( coords, gp->giveNaturalCoordinates() );
     double xtarget = coords.at(1);
 
-    double w, wsum = 0., x, xprev, damage, damageprev = 0.;
-    Element *nearElem;
+    double wsum = 0., xprev, damageprev = 0.;
 
     // process the list from the target to the end
     double distance = 0.; // distance modified by damage
     xprev = xtarget;
     for ( auto pos = postarget; pos != list->end(); ++pos ) {
-        nearElem = ( pos->nearGp )->giveElement();
+        Element *nearElem = ( pos->nearGp )->giveElement();
         nearElem->computeGlobalCoordinates( coords, pos->nearGp->giveNaturalCoordinates() );
-        x = coords.at(1);
-        damage = this->giveNonlocalMetricModifierAt(pos->nearGp);
+        double x = coords.at(1);
+        double damage = this->giveNonlocalMetricModifierAt(pos->nearGp);
         /*
          * nonlocStatus = static_cast< IDNLMaterialStatus * >( this->giveStatus(pos->nearGp) );
          * damage = nonlocStatus->giveTempDamage();
@@ -466,7 +463,7 @@ NonlocalMaterialExtensionInterface :: modifyNonlocalWeightFunction_1D_Around(Gau
             //( x - xprev ) * 0.5 * ( computeDistanceModifier(damage) + computeDistanceModifier(damageprev) );
         }
 
-        w = computeWeightFunction(distance) * nearElem->computeVolumeAround(pos->nearGp);
+        double w = computeWeightFunction(distance) * nearElem->computeVolumeAround(pos->nearGp);
         pos->weight = w;
         wsum += w;
         xprev = x;
@@ -476,10 +473,10 @@ NonlocalMaterialExtensionInterface :: modifyNonlocalWeightFunction_1D_Around(Gau
     // process the list from the target to the beginning
     distance = 0.;
     for ( auto pos = postarget; pos != list->begin(); --pos ) {
-        nearElem = ( pos->nearGp )->giveElement();
+        Element *nearElem = ( pos->nearGp )->giveElement();
         nearElem->computeGlobalCoordinates( coords, pos->nearGp->giveNaturalCoordinates() );
-        x = coords.at(1);
-        damage = this->giveNonlocalMetricModifierAt(pos->nearGp);
+        double x = coords.at(1);
+        double damage = this->giveNonlocalMetricModifierAt(pos->nearGp);
         /*
          * nonlocStatus = static_cast< IDNLMaterialStatus * >( this->giveStatus(pos->nearGp) );
          * damage = nonlocStatus->giveTempDamage();
@@ -491,7 +488,7 @@ NonlocalMaterialExtensionInterface :: modifyNonlocalWeightFunction_1D_Around(Gau
         if ( pos != postarget ) {
             distance += computeModifiedLength(xprev - x, damage, damageprev);
             //distance += ( xprev - x ) * 0.5 * ( computeDistanceModifier(damage) + computeDistanceModifier(damageprev) );
-            w = computeWeightFunction(distance) * nearElem->computeVolumeAround(pos->nearGp);
+            double w = computeWeightFunction(distance) * nearElem->computeVolumeAround(pos->nearGp);
             pos->weight = w;
             wsum += w;
         }
@@ -503,10 +500,10 @@ NonlocalMaterialExtensionInterface :: modifyNonlocalWeightFunction_1D_Around(Gau
     // the beginning must be treated separately
     auto pos = list->begin();
     if ( pos != postarget ) {
-        nearElem = ( pos->nearGp )->giveElement();
+        Element *nearElem = ( pos->nearGp )->giveElement();
         nearElem->computeGlobalCoordinates( coords, pos->nearGp->giveNaturalCoordinates() );
-        x = coords.at(1);
-        damage = this->giveNonlocalMetricModifierAt(pos->nearGp);
+        double x = coords.at(1);
+        double damage = this->giveNonlocalMetricModifierAt(pos->nearGp);
         /*
          * nonlocStatus = static_cast< IDNLMaterialStatus * >( this->giveStatus(pos->nearGp) );
          * damage = nonlocStatus->giveTempDamage();
@@ -517,7 +514,7 @@ NonlocalMaterialExtensionInterface :: modifyNonlocalWeightFunction_1D_Around(Gau
 
         distance += computeModifiedLength(xprev - x, damage, damageprev);
         //distance += ( xprev - x ) * 0.5 * ( computeDistanceModifier(damage) + computeDistanceModifier(damageprev) );
-        w = computeWeightFunction(distance) * nearElem->computeVolumeAround(pos->nearGp);
+        double w = computeWeightFunction(distance) * nearElem->computeVolumeAround(pos->nearGp);
         pos->weight = w;
         wsum += w;
     }
@@ -656,7 +653,7 @@ NonlocalMaterialExtensionInterface :: computeWeightFunction(double distance)
 double
 NonlocalMaterialExtensionInterface :: computeWeightFunction(const FloatArray &src, const FloatArray &coord)
 {
-    return computeWeightFunction( src.distance(coord) );
+    return computeWeightFunction( distance(src, coord) );
 }
 
 double
@@ -841,8 +838,8 @@ NonlocalMaterialExtensionInterface :: initializeFrom(InputRecord *ir)
     if ( averType >= 2 && averType <= 6 ) { // eikonal models
         gridSize = 10; // default value
         IR_GIVE_OPTIONAL_FIELD(ir, gridSize, _IFT_NonlocalMaterialExtensionInterface_gridsize);
-        grid = new Grid(2 *gridSize + 1, 2 *gridSize + 1);
-        minDist2 = new FloatMatrix(2 *gridSize + 1, 2 *gridSize + 1);
+        grid = std::make_unique<Grid>(2 *gridSize + 1, 2 *gridSize + 1);
+        minDist2 = std::make_unique<FloatMatrix>(2 *gridSize + 1, 2 *gridSize + 1);
         order = 1; // default value
         IR_GIVE_OPTIONAL_FIELD(ir, order, _IFT_NonlocalMaterialExtensionInterface_order);
         initDiag = 0.; // default value

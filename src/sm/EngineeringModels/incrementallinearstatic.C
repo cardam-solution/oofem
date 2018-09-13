@@ -76,7 +76,7 @@ NumericalMethod *IncrementalLinearStatic :: giveNumericalMethod(MetaStep *mStep)
 
 {
     if ( !nMethod ) {
-        nMethod.reset( classFactory.createSparseLinSolver(solverType, this->giveDomain(1), this) );
+        nMethod = classFactory.createSparseLinSolver(solverType, this->giveDomain(1), this);
         if ( !nMethod ) {
             OOFEM_ERROR("linear solver creation failed for lstype %d", solverType);
         }
@@ -295,7 +295,7 @@ void IncrementalLinearStatic :: solveYourselfAt(TimeStep *tStep)
 #ifdef VERBOSE
     OOFEM_LOG_INFO("Assembling stiffness matrix\n");
 #endif
-    stiffnessMatrix.reset( classFactory.createSparseMtrx(sparseMtrxType) );
+    stiffnessMatrix = classFactory.createSparseMtrx(sparseMtrxType);
     if ( !stiffnessMatrix ) {
         OOFEM_ERROR("sparse matrix creation failed");
     }
@@ -365,26 +365,14 @@ void IncrementalLinearStatic :: updateDofUnknownsDictionary(DofManager *inode, T
 }
 
 
-contextIOResultType IncrementalLinearStatic :: saveContext(DataStream &stream, ContextMode mode)
+void IncrementalLinearStatic :: saveContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    if ( ( iores = StructuralEngngModel :: saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    return CIO_OK;
+    StructuralEngngModel :: saveContext(stream, mode);
 }
 
 
-contextIOResultType IncrementalLinearStatic :: restoreContext(DataStream &stream, ContextMode mode)
+void IncrementalLinearStatic :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    contextIOResultType iores;
-
-    if ( ( iores = StructuralEngngModel :: restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
-    return CIO_OK;
+    StructuralEngngModel :: restoreContext(stream, mode);
 }
 } // end namespace oofem

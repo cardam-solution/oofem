@@ -48,6 +48,7 @@ namespace oofem {
 class IntArray;
 class FloatMatrix;
 class DataStream;
+template<int N> class FloatArrayF;
 
 /**
  * Class representing vector of real numbers. This array can grow or shrink to
@@ -105,8 +106,14 @@ public:
     FloatArray(FloatArray &&src) : values(std::move(src.values)) { }
     /// Initializer list constructor.
     inline FloatArray(std :: initializer_list< double >list) : values(list) { }
+    /// Wrapper to direct assignment from iterator pairs
+    template< class InputIt >
+    FloatArray( InputIt first, InputIt last ) : values(first, last) { }
+    /// Wrapper to direct assignment from iterator pairs
+    template< int N >
+    inline FloatArray( const FloatArrayF<N> &src ) : values(src.begin(), src.end()) { }
     /// Destructor.
-    virtual ~FloatArray() {};
+    virtual ~FloatArray() {}
 
     /// Assignment operator
     FloatArray &operator = (const FloatArray &src) { values = src.values; return *this; }
@@ -114,9 +121,12 @@ public:
     FloatArray &operator = (FloatArray &&src) { values = std::move(src.values); return *this; }
     /// Assignment operator.
     inline FloatArray &operator = (std :: initializer_list< double >list) { values = list; return *this; }
+    /// Assign from fixed size array
+    template<int N>
+    inline FloatArray &operator = (const FloatArrayF<N> &src) { values.assign(src.begin(), src.end()); return *this; }
 
     /// Add one element
-    void push_back(const double &iVal) {values.push_back(iVal);}
+    void push_back(double iVal) { values.push_back(iVal); }
 
     /// Returns true if no element is NAN or infinite
     bool isFinite() const;
@@ -549,7 +559,14 @@ FloatArray &operator += ( FloatArray & x, const FloatArray & y );
 FloatArray &operator -= ( FloatArray & x, const FloatArray & y );
 
 double norm(const FloatArray &x);
+double norm_square(const FloatArray &x);
 double dot(const FloatArray &x, const FloatArray &y);
+double distance(const FloatArray &x, const FloatArray &y);
+double distance_square(const FloatArray &x, const FloatArray &y);
+bool isfinite(const FloatArray &x);
+bool iszero(const FloatArray &x);
+double sum(const FloatArray & x);
+double product(const FloatArray & x);
 //@}
 } // end namespace oofem
 #endif // floatarray_h

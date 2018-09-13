@@ -123,7 +123,7 @@ CBS :: ~CBS()
 NumericalMethod *CBS :: giveNumericalMethod(MetaStep *mStep)
 {
     if ( !nMethod ) {
-        nMethod.reset( classFactory.createSparseLinSolver(solverType, this->giveDomain(1), this) );
+        nMethod = classFactory.createSparseLinSolver(solverType, this->giveDomain(1), this);
         if ( !nMethod ) {
             OOFEM_ERROR("linear solver creation failed for lstype %d", solverType);
         }
@@ -284,7 +284,7 @@ CBS :: solveYourselfAt(TimeStep *tStep)
                                          pnumPrescribed, this->giveDomain(1) );
 
 
-        lhs.reset( classFactory.createSparseMtrx(sparseMtrxType) );
+        lhs = classFactory.createSparseMtrx(sparseMtrxType);
         if ( !lhs ) {
             OOFEM_ERROR("sparse matrix creation failed");
         }
@@ -296,7 +296,7 @@ CBS :: solveYourselfAt(TimeStep *tStep)
         lhs->times(deltaT * theta1 * theta2);
 
         if ( consistentMassFlag ) {
-            mss.reset( classFactory.createSparseMtrx(sparseMtrxType) );
+            mss = classFactory.createSparseMtrx(sparseMtrxType);
             if ( !mss ) {
                 OOFEM_ERROR("sparse matrix creation failed");
             }
@@ -474,37 +474,27 @@ CBS :: updateInternalState(TimeStep *tStep)
 }
 
 
-contextIOResultType
+void
 CBS :: saveContext(DataStream &stream, ContextMode mode)
 {
+    EngngModel :: saveContext(stream, mode);
+
     contextIOResultType iores;
-
-    if ( ( iores = EngngModel :: saveContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
     if ( ( iores = prescribedTractionPressure.storeYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
 
-contextIOResultType
+void
 CBS :: restoreContext(DataStream &stream, ContextMode mode)
 {
+    EngngModel :: restoreContext(stream, mode);
+
     contextIOResultType iores;
-
-    if ( ( iores = EngngModel :: restoreContext(stream, mode) ) != CIO_OK ) {
-        THROW_CIOERR(iores);
-    }
-
     if ( ( iores = prescribedTractionPressure.restoreYourself(stream) ) != CIO_OK ) {
         THROW_CIOERR(iores);
     }
-
-    return CIO_OK;
 }
 
 
