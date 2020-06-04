@@ -47,41 +47,39 @@ REGISTER_Material(CohesiveInterfaceMaterial);
 
 CohesiveInterfaceMaterial :: CohesiveInterfaceMaterial(int n, Domain *d) : StructuralInterfaceMaterial(n, d) { }
 
-void
-CohesiveInterfaceMaterial :: giveEngTraction_3d(FloatArray &answer, GaussPoint *gp, const FloatArray &jump, TimeStep *tStep)
+FloatArrayF<3>
+CohesiveInterfaceMaterial :: giveEngTraction_3d(const FloatArrayF<3> &jump, GaussPoint *gp, TimeStep *tStep) const
 {
     StructuralInterfaceMaterialStatus *status = static_cast< StructuralInterfaceMaterialStatus * >( this->giveStatus(gp) );
 
-    answer.resize(3);
-
     double x = jump.at(1) + transitionOpening;
-    
-    if (stiffCoeffKn == 1.){//tension stiffness = compression stiffness
+
+    FloatArrayF<3> answer;
+
+    if ( stiffCoeffKn == 1. ){ //tension stiffness = compression stiffness
         answer.at(1) = kn*x;
     } else {
         //composed function from two atan's to have smooth intersection between tension and compression
         answer.at(1) = (M_PI/2. + atan(smoothMag*x))/M_PI*kn*stiffCoeffKn*x + (M_PI/2.-atan(smoothMag*x))/M_PI*kn*x;
     }
-    
+
     // shear part of elastic stress-strain law
     answer.at(2) = ks * jump.at(2);
     answer.at(3) = ks * jump.at(3);
-    
+
     // update gp
     status->letTempJumpBe(jump);
     status->letTempTractionBe(answer);
+    return answer;
 }
 
 
-void
-CohesiveInterfaceMaterial :: give3dStiffnessMatrix_Eng(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep)
+FloatMatrixF<3,3>
+CohesiveInterfaceMaterial :: give3dStiffnessMatrix_Eng(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const
 {
-    answer.resize(3, 3);
-    answer.zero();
-    
     StructuralInterfaceMaterialStatus *status = static_cast< StructuralInterfaceMaterialStatus * >( this->giveStatus(gp) );
+
 //     double normalJump = status->giveTempJump().at(1);
-    
 //     if (normalJump > 0.) {
 //         if(normalJump<transitionOpening){ // reduce traction in tension
 //             double stiffTmp = kn*stiffCoeffKn + (kn - kn*stiffCoeffKn) * (1. - normalJump/transitionOpening);
@@ -103,32 +101,25 @@ CohesiveInterfaceMaterial :: give3dStiffnessMatrix_Eng(FloatMatrix &answer, MatR
 //     } else {
 //         answer.at(1, 1) = kn; 
 //     }
-    
-    
+
     double x = status->giveTempJump().at(1) + transitionOpening;
-    
-    if (stiffCoeffKn == 1.){//tension stiffness = compression stiffness
-        answer.at(1,1) = kn;
+
+    double normal;
+    if ( stiffCoeffKn == 1. ) { //tension stiffness = compression stiffness
+        normal = kn;
     } else {
         //TangentStiffness by derivating traction with regards to x (=relative displacement)
-        answer.at(1,1) = (M_PI/2. + atan(smoothMag*x))/M_PI*kn*stiffCoeffKn + (M_PI/2.-atan(smoothMag*x))/M_PI*kn + smoothMag*kn*stiffCoeffKn*x/M_PI/(smoothMag*smoothMag*x*x+1) - smoothMag*kn*x/M_PI/(smoothMag*smoothMag*x*x+1);
+        normal = (M_PI/2. + atan(smoothMag*x))/M_PI*kn*stiffCoeffKn + (M_PI/2.-atan(smoothMag*x))/M_PI*kn + smoothMag*kn*stiffCoeffKn*x/M_PI/(smoothMag*smoothMag*x*x+1) - smoothMag*kn*x/M_PI/(smoothMag*smoothMag*x*x+1);
     }
-    
-    //answer.at(1, 1) = kn; 
-    answer.at(2, 2) = ks;
-    answer.at(3, 3) = ks;
+
+    return diag<3>({normal, ks, ks});
 }
 
-int
-CohesiveInterfaceMaterial :: giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep)
-{
-    return StructuralInterfaceMaterial :: giveIPValue(answer, gp, type, tStep);
-}
 
-IRResultType
-CohesiveInterfaceMaterial :: initializeFrom(InputRecord *ir)
+void
+CohesiveInterfaceMaterial :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;
+    StructuralInterfaceMaterial :: initializeFrom(ir);
 
     // elastic parameters
     IR_GIVE_FIELD(ir, kn, _IFT_CohesiveInterfaceMaterial_kn);
@@ -141,8 +132,6 @@ CohesiveInterfaceMaterial :: initializeFrom(InputRecord *ir)
 
     smoothMag = 1.e+8;
     IR_GIVE_OPTIONAL_FIELD(ir, smoothMag, _IFT_CohesiveInterfaceMaterial_smoothMag);
-    
-    return StructuralInterfaceMaterial :: initializeFrom(ir);
 }
 
 void

@@ -45,15 +45,14 @@ MaxwellChainMaterial :: MaxwellChainMaterial(int n, Domain *d) : RheoChainMateri
 { }
 
 
-void
-MaxwellChainMaterial :: computeCharCoefficients(FloatArray &answer, double tPrime, GaussPoint *gp, TimeStep *tStep)
+FloatArray
+MaxwellChainMaterial :: computeCharCoefficients(double tPrime, GaussPoint *gp, TimeStep *tStep) const
 {
-    int rSize;
     FloatArray rhs(this->nUnits), discreteRelaxFunctionVal;
     FloatMatrix A(this->nUnits, this->nUnits);
 
     const FloatArray &rTimes = this->giveDiscreteTimes();
-    rSize = rTimes.giveSize();
+    int rSize = rTimes.giveSize();
 
     // compute discrete values of the relaxation function at times rTimes
     // from the creep function (by numerically solving integral equations)
@@ -96,13 +95,15 @@ MaxwellChainMaterial :: computeCharCoefficients(FloatArray &answer, double tPrim
     }
 
     // solve the linear system
+    FloatArray answer;
     A.solveForRhs(rhs, answer);
+    return answer;
 }
 
 
 
 double
-MaxwellChainMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep)
+MaxwellChainMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep) const
 {
     /*
      * This function returns the incremental modulus for the given time increment.
@@ -114,11 +115,12 @@ MaxwellChainMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep)
 
     ///@warning THREAD UNSAFE!
 
-    if (  (tStep->giveIntrinsicTime() < this->castingTime)  ) {
+    // the viscoelastic material does not exist yet
+    if  ( ! Material :: isActivated( tStep ) ) {
       OOFEM_ERROR("Attempted to evaluate E modulus at time lower than casting time");
     }
 
-    double tPrime = relMatAge + ( tStep->giveTargetTime() - 0.5 * tStep->giveTimeIncrement() ) / timeFactor;
+    double tPrime = this->relMatAge - this->castingTime + ( tStep->giveTargetTime() - 0.5 * tStep->giveTimeIncrement() ) / timeFactor;
     this->updateEparModuli(tPrime, gp, tStep);
 
     for ( int mu = 1; mu <= nUnits; mu++ ) {
@@ -142,7 +144,7 @@ MaxwellChainMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep)
 
 void
 MaxwellChainMaterial :: giveEigenStrainVector(FloatArray &answer,
-                                              GaussPoint *gp, TimeStep *tStep, ValueModeType mode)
+                                              GaussPoint *gp, TimeStep *tStep, ValueModeType mode) const
 //
 // computes the strain due to creep at constant stress during the increment
 // (in fact, the INCREMENT of creep strain is computed for mode == VM_Incremental)
@@ -153,7 +155,7 @@ MaxwellChainMaterial :: giveEigenStrainVector(FloatArray &answer,
     FloatMatrix B;
     MaxwellChainMaterialStatus *status = static_cast< MaxwellChainMaterialStatus * >( this->giveStatus(gp) );
 
-    if (  (tStep->giveIntrinsicTime() < this->castingTime)  ) {
+    if ( ! Material :: isActivated( tStep ) ) {
       OOFEM_ERROR("Attempted to evaluate creep strain for time lower than casting time");
     }
 
@@ -210,6 +212,17 @@ MaxwellChainMaterial :: computeHiddenVars(GaussPoint *gp, TimeStep *tStep)
     MaxwellChainMaterialStatus *status =
         static_cast< MaxwellChainMaterialStatus * >( this->giveStatus(gp) );
 
+    
+    // goes there if the viscoelastic material does not exist yet
+    if (  ! Material :: isActivated( tStep ) )  {
+        help.resize(StructuralMaterial :: giveSizeOfVoigtSymVector( gp->giveMaterialMode() ) );
+        help.zero();
+        for ( int mu = 1; mu <= nUnits; mu++ ) {
+            status->letTempHiddenVarsVectorBe(mu, help);
+        }
+        return;
+    }
+    
     this->giveUnitStiffnessMatrix(Binv, gp, tStep);
     help = status->giveTempStrainVector();
     help.subtract( status->giveStrainVector() );
@@ -223,8 +236,9 @@ MaxwellChainMaterial :: computeHiddenVars(GaussPoint *gp, TimeStep *tStep)
     help1.beProductOf(Binv, help);
 
     ///@warning THREAD UNSAFE!
-    double tPrime = relMatAge + ( tStep->giveTargetTime() - 0.5 * tStep->giveTimeIncrement() ) / timeFactor;
-    this->updateEparModuli(tPrime, gp, tStep);
+    // redundant two subsequent lines?
+    //    double tPrime = relMatAge - this->castingTime + ( tStep->giveTargetTime() - 0.5 * tStep->giveTimeIncrement() ) / timeFactor;
+    //    this->updateEparModuli(tPrime, gp, tStep);
 
     for ( int mu = 1; mu <= nUnits; mu++ ) {
         double deltaYmu = tStep->giveTimeIncrement() / timeFactor / this->giveCharTime(mu);
@@ -250,25 +264,24 @@ MaxwellChainMaterial :: computeHiddenVars(GaussPoint *gp, TimeStep *tStep)
 MaterialStatus *
 MaxwellChainMaterial :: CreateStatus(GaussPoint *gp) const
 {
-    return new MaxwellChainMaterialStatus(1, this->giveDomain(), gp, nUnits);
+    return new MaxwellChainMaterialStatus(gp, nUnits);
 }
 
 
-IRResultType
-MaxwellChainMaterial :: initializeFrom(InputRecord *ir)
+void
+MaxwellChainMaterial :: initializeFrom(InputRecord &ir)
 {
-    return RheoChainMaterial :: initializeFrom(ir);
+    RheoChainMaterial :: initializeFrom(ir);
 }
 
 /****************************************************************************************/
 
-MaxwellChainMaterialStatus :: MaxwellChainMaterialStatus(int n, Domain *d,
-                                                         GaussPoint *g, int nunits) :
-    RheoChainMaterialStatus(n, d, g, nunits) { }
+MaxwellChainMaterialStatus :: MaxwellChainMaterialStatus(GaussPoint *g, int nunits) :
+    RheoChainMaterialStatus(g, nunits) { }
 
 
 void
-MaxwellChainMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep)
+MaxwellChainMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep) const
 {
     RheoChainMaterialStatus :: printOutputAt(file, tStep);
 }

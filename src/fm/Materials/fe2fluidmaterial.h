@@ -77,13 +77,11 @@ public:
     /**
      * Creates new material status.
      * @param n Material status number.
-     * @param d Domain that status belongs to.
+     * @param rank Parallel rank (ignored if negative).
      * @param gp Gauss point that the status belongs to.
      * @param inputfile The input file describing the micro problem.
      */
-    FE2FluidMaterialStatus(int n, Domain * d, GaussPoint * gp, const std :: string & inputfile);
-    /// Destructor
-    virtual ~FE2FluidMaterialStatus() {}
+    FE2FluidMaterialStatus(int n, int rank, GaussPoint * gp, const std :: string & inputfile);
 
     EngngModel *giveRVE() { return this->rve.get(); }
     MixedGradientPressureBC *giveBC() { return this->bc; }
@@ -94,7 +92,7 @@ public:
     double giveVOFFraction() { return this->voffraction; }
 
     /// Creates/Initiates the RVE problem.
-    bool createRVE(int n, GaussPoint *gp, const std :: string &inputfile);
+    bool createRVE(int n, int rank, GaussPoint *gp, const std :: string &inputfile);
 
     /// Copies time step data to RVE.
     void setTimeStep(TimeStep *tStep);
@@ -107,7 +105,7 @@ public:
     double givePressure() { return this->pressure; }
     void letPressureBe(double val) { this->pressure = val; }
 
-    void printOutputAt(FILE *file, TimeStep *tStep) override;
+    void printOutputAt(FILE *file, TimeStep *tStep) const override;
 
     void initTempStatus() override;
     void updateYourself(TimeStep *tStep) override;
@@ -142,24 +140,21 @@ public:
      * @param d Domain to which new material will belong.
      */
     FE2FluidMaterial(int n, Domain * d) : FluidDynamicMaterial(n, d) { }
-    /// Destructor.
-    virtual ~FE2FluidMaterial() { }
 
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
     void giveInputRecord(DynamicInputRecord &input) override;
 
     int checkConsistency() override;
 
     MaterialStatus *CreateStatus(GaussPoint *gp) const override;
 
-    void computeDeviatoricStress3D(FloatArray &stress_dev, double &r_vol, GaussPoint *gp, const FloatArray &eps, double pressure, TimeStep *tStep) override;
-    void computeDeviatoricStress3D(FloatArray &answer, GaussPoint *gp, const FloatArray &eps, TimeStep *tStep) override;
+    std::pair<FloatArrayF<6>, double> computeDeviatoricStress3D(const FloatArrayF<6> &eps, double pressure, GaussPoint *gp, TimeStep *tStep) const override;
+    FloatArrayF<6> computeDeviatoricStress3D(const FloatArrayF<6> &eps, GaussPoint *gp, TimeStep *tStep) const override;
 
-    void computeTangent3D(FloatMatrix &answer, MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) override;
-    void computeTangents3D(FloatMatrix &dsdd, FloatArray &dsdp, FloatArray &dedd, double &dedp,
-                               MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) override;
+    FloatMatrixF<6,6> computeTangent3D(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const override;
+    Tangents<6> computeTangents3D(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const override;
 
-    double giveEffectiveViscosity(GaussPoint *gp, TimeStep *tStep) override;
+    double giveEffectiveViscosity(GaussPoint *gp, TimeStep *tStep) const override;
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
 

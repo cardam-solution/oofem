@@ -50,30 +50,13 @@ REGISTER_Material(MPSMaterial);
 
 
 
-MPSMaterialStatus :: MPSMaterialStatus(int n, Domain *d, GaussPoint *gp, int nunits) :
-    KelvinChainSolidMaterialStatus(n, d, gp, nunits)
+MPSMaterialStatus :: MPSMaterialStatus(GaussPoint *gp, int nunits) :
+    KelvinChainSolidMaterialStatus(gp, nunits)
 {
-    hum = -1.;
-    hum_increment = -1.;
-    T = -1.;
-    T_increment = -1.;
-    storedEmodulusFlag = false;
-    storedEmodulus = -1.;
-    equivalentTime = 0.;
-    equivalentTimeTemp = 0.;
-    flowTermViscosityTemp = -1.;
-
 #ifdef keep_track_of_strains
-    dryingShrinkageStrain = 0.;
-    tempDryingShrinkageStrain = 0.;
-    autogenousShrinkageStrain = 0.;
-    tempAutogenousShrinkageStrain = 0.;
-
-    int rsize = StructuralMaterial :: giveSizeOfVoigtSymVector( gp->giveMaterialMode() );
+    int rsize = StructuralMaterial :: giveSizeOfVoigtSymVector(gp->giveMaterialMode() );
     creepStrain.resize(rsize);
-    creepStrain.zero();
     creepStrainIncrement.resize(rsize);
-    creepStrainIncrement.zero();
 #endif
 }
 
@@ -133,7 +116,6 @@ MPSMaterialStatus :: initTempStatus()
     creepStrainIncrement.zero();
     tempAutogenousShrinkageStrain = 0.;
 #endif
-
 }
 
 void
@@ -170,11 +152,9 @@ MPSMaterialStatus :: restoreContext(DataStream &stream, ContextMode mode)
 //   **********************************************************************************************
 
 
-IRResultType
-MPSMaterial :: initializeFrom(InputRecord *ir)
+void
+MPSMaterial :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;                   // Required by IR_GIVE_FIELD macro
-
     double fc, c, wc, ac;
 
     /* scaling factor transforming PREDICTED stiffnesses q1, q2, q3 and q4 to desired
@@ -183,20 +163,18 @@ MPSMaterial :: initializeFrom(InputRecord *ir)
     this->stiffnessFactor = 1.e6;
     IR_GIVE_OPTIONAL_FIELD(ir, stiffnessFactor, _IFT_MPSMaterial_stiffnessfactor);
 
-    result = KelvinChainSolidMaterial :: initializeFrom(ir);
-    if ( result != IRRT_OK ) return result;
+    KelvinChainSolidMaterial :: initializeFrom(ir);
 
-    // checking timefactor - for MPS material must be equal to 1.
+    // checking timefactor - for MPS material must be equal to 1. (in seconds)
     double tf;
     IR_GIVE_FIELD(ir, tf, _IFT_RheoChainMaterial_timefactor);
     if ( tf != 1. ) {
-        OOFEM_WARNING("for MPS material timefactor must be equal to 1.");
-        return IRRT_BAD_FORMAT;
+        throw ValueInputException(ir, _IFT_RheoChainMaterial_timefactor, "for MPS material timefactor must be equal to 1.");
     }
 
     // initialize exponent p or p_tilde of the governing equation
-    if ( ir->hasField(_IFT_MPSMaterial_p_tilde) &&  ir->hasField(_IFT_MPSMaterial_p) ) {
-        OOFEM_ERROR("for MPS p and p_tilde cannot be defined at the same time");
+    if ( ir.hasField(_IFT_MPSMaterial_p_tilde) && ir.hasField(_IFT_MPSMaterial_p) ) {
+        throw ValueInputException(ir, _IFT_MPSMaterial_p_tilde, "for MPS p and p_tilde cannot be defined at the same time");
     }
 
     double p_tilde = 2.;
@@ -209,10 +187,10 @@ MPSMaterial :: initializeFrom(InputRecord *ir)
         p = 100.;
     }
 
+    IR_GIVE_FIELD(ir, lambda0, _IFT_MPSMaterial_lambda0);
+
     int mode = 0;
     IR_GIVE_OPTIONAL_FIELD(ir, mode, _IFT_MPSMaterial_mode);
-
-
 
     if ( mode == 0 ) { // default - estimate model parameters q1,..,q4 from composition
         IR_GIVE_FIELD(ir, fc, _IFT_MPSMaterial_fc); // 28-day standard cylinder compression strength [MPa]
@@ -228,13 +206,10 @@ MPSMaterial :: initializeFrom(InputRecord *ir)
         IR_GIVE_FIELD(ir, q4, _IFT_MPSMaterial_q4);
     }
 
-    IR_GIVE_FIELD(ir, lambda0, _IFT_MPSMaterial_lambda0);
-
     int type = 1;
     IR_GIVE_OPTIONAL_FIELD(ir, type, _IFT_MPSMaterial_coupledanalysistype);
     if ( type >= 4 ) {
-        OOFEM_WARNING("CoupledAnalysisType must be equal to 0, 1, 2 or 3");
-        return IRRT_BAD_FORMAT;
+        throw ValueInputException(ir, _IFT_MPSMaterial_coupledanalysistype, "must be 0, 1, 2 or 3");
     }
 
     this->CoupledAnalysis = ( coupledAnalysisType ) type;
@@ -242,7 +217,9 @@ MPSMaterial :: initializeFrom(InputRecord *ir)
 
     if ( ( this->CoupledAnalysis == MPS_full ) || ( this->CoupledAnalysis == MPS_humidity ) ||  ( this->CoupledAnalysis == MPS_temperature ) ) {
         // age when drying or thermal changes begin [days] - necessary to determine initial viscosity
-        IR_GIVE_FIELD(ir, t0, _IFT_MPSMaterial_t0);
+        // time t0 is equal to relMatAge
+        //      IR_GIVE_FIELD(ir, t0, _IFT_MPSMaterial_t0);
+        this->t0 = this->relMatAge;
 
         if ( this->p < 100. ) {
             // muS- the only parameter necessary for evaluation of the flow-term viscosity
@@ -265,6 +242,20 @@ MPSMaterial :: initializeFrom(InputRecord *ir)
         IR_GIVE_OPTIONAL_FIELD(ir, sh_a, _IFT_MPSMaterial_sh_a);
         IR_GIVE_OPTIONAL_FIELD(ir, sh_hC, _IFT_MPSMaterial_sh_hC);
         IR_GIVE_OPTIONAL_FIELD(ir, sh_n, _IFT_MPSMaterial_sh_n);
+
+
+        if ( ir.hasField(_IFT_MPSMaterial_factor_ksh_h) && ir.hasField(_IFT_MPSMaterial_factor_ksh_fh) ) {
+            IR_GIVE_FIELD(ir, ksh_h, _IFT_MPSMaterial_factor_ksh_h);
+            IR_GIVE_FIELD(ir, ksh_fh, _IFT_MPSMaterial_factor_ksh_fh);
+
+            if ( ksh_h.giveSize() != ksh_fh.giveSize() ) {
+                throw ValueInputException(ir, _IFT_MPSMaterial_factor_ksh_h, "the size of 'ksh_h' and 'ksh_f(h)' must be the same");
+            }
+        }
+
+        if ( ir.hasField(_IFT_MPSMaterial_timedependent_ksh) ) {
+            this->timeDependent_ksh = true;
+        }
 
         this->alphaE = 10.; // according to Bazant 1995
         IR_GIVE_OPTIONAL_FIELD(ir, alphaE, _IFT_MPSMaterial_alphae);
@@ -298,7 +289,7 @@ MPSMaterial :: initializeFrom(InputRecord *ir)
 
         /// flag - if true, external fields and reference temperature are in Celsius
         this->temperScaleDifference = 0.;
-        if ( ir->hasField(_IFT_MPSMaterial_temperInCelsius) ) {
+        if ( ir.hasField(_IFT_MPSMaterial_temperInCelsius) ) {
             this->temperScaleDifference = 273.15;
         }
 
@@ -319,7 +310,7 @@ MPSMaterial :: initializeFrom(InputRecord *ir)
     this->eps_cas0 = 0.;
     IR_GIVE_OPTIONAL_FIELD(ir, eps_cas0, _IFT_MPSMaterial_eps_cas0);
 
-    if ( ir->hasField(_IFT_MPSMaterial_alpha_as) &&  ir->hasField(_IFT_MPSMaterial_fc) ) {
+    if ( ir.hasField(_IFT_MPSMaterial_alpha_as) && ir.hasField(_IFT_MPSMaterial_fc) ) {
         double alpha_as;
         // table 5.1-13 from fib2010
         // alpha_as = 800 for cem 32.5N
@@ -338,8 +329,8 @@ MPSMaterial :: initializeFrom(InputRecord *ir)
     b4_tau_au = 0.;
     b4_alpha = 0.;
     b4_r_t = 0.;
-  
-    if ( ir->hasField(_IFT_MPSMaterial_B4_cem_type) ) {
+
+    if ( ir.hasField(_IFT_MPSMaterial_B4_cem_type) ) {
         /// auxiliary parameters for autogenous shrinkage according to B4 model
         double b4_r_alpha = 0., b4_eps_au_cem = 0., b4_tau_au_cem = 0., b4_r_ea, b4_r_ew, b4_r_tw;
         int b4_cem_type;
@@ -371,29 +362,31 @@ MPSMaterial :: initializeFrom(InputRecord *ir)
             b4_r_ea = -0.75;
             b4_r_ew = -3.5;
         } else {
-            OOFEM_ERROR("Unknown cement type (b4_cem_type)");
+            throw ValueInputException(ir, _IFT_MPSMaterial_B4_cem_type, "Unknown cement type");
         }
 
-        IR_GIVE_FIELD(ir, wc, _IFT_MPSMaterial_wc);
-        IR_GIVE_FIELD(ir, ac, _IFT_MPSMaterial_ac);
 
-        if ( ir->hasField( _IFT_MPSMaterial_B4_eps_au_infty) ) { 
-          IR_GIVE_FIELD(ir, b4_eps_au_infty, _IFT_MPSMaterial_B4_eps_au_infty);
-        } else { 
-          b4_eps_au_infty = -b4_eps_au_cem *pow(ac / 6., b4_r_ea) *  pow(wc / 0.38, b4_r_ew);
-        }
-
-        if ( ir->hasField( _IFT_MPSMaterial_B4_tau_au) ) { 
-          IR_GIVE_FIELD(ir, b4_tau_au, _IFT_MPSMaterial_B4_tau_au); // must be in units of the analysis
+        if ( ir.hasField(_IFT_MPSMaterial_B4_eps_au_infty) ) {
+            IR_GIVE_FIELD(ir, b4_eps_au_infty, _IFT_MPSMaterial_B4_eps_au_infty);
         } else {
-          b4_tau_au = b4_tau_au_cem * pow(wc / 0.38, b4_r_tw);
-          b4_tau_au *= lambda0; // converted to desired time unit
+            IR_GIVE_FIELD(ir, wc, _IFT_MPSMaterial_wc);
+            IR_GIVE_FIELD(ir, ac, _IFT_MPSMaterial_ac);
+            b4_eps_au_infty = -b4_eps_au_cem *pow(ac / 6., b4_r_ea) *  pow(wc / 0.38, b4_r_ew);
         }
 
-        if ( ir->hasField( _IFT_MPSMaterial_B4_alpha) ) {
-          IR_GIVE_FIELD(ir, b4_alpha, _IFT_MPSMaterial_B4_alpha);
+        if ( ir.hasField(_IFT_MPSMaterial_B4_tau_au) ) {
+            IR_GIVE_FIELD(ir, b4_tau_au, _IFT_MPSMaterial_B4_tau_au); // must be in units of the analysis
         } else {
-          b4_alpha = b4_r_alpha * wc / 0.38;
+            IR_GIVE_FIELD(ir, wc, _IFT_MPSMaterial_wc);
+            b4_tau_au = b4_tau_au_cem * pow(wc / 0.38, b4_r_tw);
+            b4_tau_au *= lambda0; // converted to desired time unit
+        }
+
+        if ( ir.hasField(_IFT_MPSMaterial_B4_alpha) ) {
+            IR_GIVE_FIELD(ir, b4_alpha, _IFT_MPSMaterial_B4_alpha);
+        } else {
+            IR_GIVE_FIELD(ir, wc, _IFT_MPSMaterial_wc);
+            b4_alpha = b4_r_alpha * wc / 0.38;
         }
 
         // possibility to overwrite default value of exponent r_t
@@ -401,10 +394,9 @@ MPSMaterial :: initializeFrom(InputRecord *ir)
     }
 
     if ( ( eps_cas0 != 0. ) && ( b4_eps_au_infty != 0. ) ) {
-        OOFEM_ERROR("autogenous shrinkage cannot be described according to fib and B4 simultaneously");
+        throw ValueInputException(ir, _IFT_MPSMaterial_B4_eps_au_infty,
+                                  "autogenous shrinkage cannot be described according to fib and B4 simultaneously");
     }
-
-    return IRRT_OK;
 }
 
 
@@ -413,15 +405,13 @@ MPSMaterial :: giveRealStressVector(FloatArray &answer, GaussPoint *gp, const Fl
 {
     KelvinChainSolidMaterial :: giveRealStressVector(answer, gp, reducedStrain, tStep);
 
-    if ( !this->isActivated(tStep) ) {
+    if ( !Material :: isActivated(tStep) ) {
         return;
     }
 
     MPSMaterialStatus *status = static_cast< MPSMaterialStatus * >( this->giveStatus(gp) );
 
-    if ( ( this->CoupledAnalysis == MPS_full ) ||  ( this->CoupledAnalysis == MPS_humidity ) || ( this->CoupledAnalysis == MPS_temperature ) ) {
-        status->setEquivalentTimeTemp( this->computeEquivalentTime(gp, tStep, 1) );
-    }
+    status->setEquivalentTimeTemp(this->computeEquivalentTime(gp, tStep, 1) );
 }
 
 
@@ -429,7 +419,7 @@ void
 MPSMaterial :: giveShrinkageStrainVector(FloatArray &answer,
                                          GaussPoint *gp,
                                          TimeStep *tStep,
-                                         ValueModeType mode)
+                                         ValueModeType mode) const
 {
     if ( ( mode != VM_Total ) && ( mode != VM_Incremental ) ) {
         OOFEM_ERROR("unsupported mode");
@@ -449,10 +439,10 @@ MPSMaterial :: giveShrinkageStrainVector(FloatArray &answer,
     double dryShrIncr = 0.;
     double autoShrIncr = 0.;
 
-    answer.resize( StructuralMaterial :: giveSizeOfVoigtSymVector( gp->giveMaterialMode() ) );
+    answer.resize(StructuralMaterial :: giveSizeOfVoigtSymVector(gp->giveMaterialMode() ) );
     answer.zero();
 
-    if ( ( this->CoupledAnalysis == Basic ) || ( this->CoupledAnalysis == MPS_temperature ) || ( !this->isActivated(tStep) ) ) {
+    if ( ( this->CoupledAnalysis == Basic ) || ( this->CoupledAnalysis == MPS_temperature ) || ( !Material :: isActivated(tStep) ) ) {
         ;
     } else { // compute drying shrinkage
         this->computePointShrinkageStrainVector(dry_shr, gp, tStep);
@@ -508,7 +498,7 @@ MPSMaterial :: giveShrinkageStrainVector(FloatArray &answer,
             fullAnswer.at(1) = fullAnswer.at(2) = fullAnswer.at(3) = status->giveAutogenousShrinkageStrain() + autoShrIncr + status->giveDryingShrinkageStrain() + dryShrIncr;
         }
 
-        StructuralMaterial :: giveReducedSymVectorForm( answer, fullAnswer, gp->giveMaterialMode() );
+        StructuralMaterial :: giveReducedSymVectorForm(answer, fullAnswer, gp->giveMaterialMode() );
     }
 
     return;
@@ -520,7 +510,7 @@ MPSMaterial :: CreateStatus(GaussPoint *gp) const
  * creates a new material status corresponding to this class
  */
 {
-    return new MPSMaterialStatus(1, this->giveDomain(), gp, nUnits);
+    return new MPSMaterialStatus(gp, nUnits);
 }
 
 
@@ -556,35 +546,39 @@ MPSMaterial :: predictParametersFrom(double fc, double c, double wc, double ac)
     char buff [ 1024 ];
     sprintf(buff, "q1=%lf q2=%lf q3=%lf q4=%lf", q1, q2, q3, q4);
     OOFEM_LOG_DEBUG("MPS[%d]: estimated params: %s\n", this->number, buff);
+    OOFEM_LOG_DEBUG("E28: %f\n", 1. / computeCreepFunction(this->lambda0 * ( 28. + 0.01 ), this->lambda0 * 28., NULL, NULL) );
 }
 
 
-
 double
-MPSMaterial :: computeCreepFunction(double t, double t_prime, GaussPoint *gp, TimeStep *tStep)
+MPSMaterial :: computeCreepFunction(double t, double t_prime, GaussPoint *gp, TimeStep *tStep) const
 {
     // computes the value of creep function at time t
     // when load is acting from time t_prime
     // t-t_prime = duration of loading
 
-    double Qf, Z, r, Q, C0;
-    double n, m;
+    // standard expressions which work with days - need to incorporate lambda0 to work in general
 
-    m = 0.5;
-    n = 0.1;
+    double m = 0.5;
+    double n = 0.1;
 
     // basic creep
+    double Qf = 1. / ( 0.086 * pow(t_prime / this->lambda0, 2. / 9.) + 1.21 * pow(t_prime / this->lambda0, 4. / 9.) );
+    double Z  = pow(t_prime / this->lambda0, -m) * log(1. + pow(t / this->lambda0 - t_prime / this->lambda0, n) );
+    double r  = 1.7 * pow(t_prime / this->lambda0, 0.12) + 8.0;
+    double Q  = Qf * pow( ( 1. + pow( ( Qf / Z ), r ) ), -1. / r );
 
-    Qf = 1. / ( 0.086 * pow(t_prime, 2. / 9.) + 1.21 * pow(t_prime, 4. / 9.) );
-    Z  = pow(t_prime, -m) * log( 1. + pow(t - t_prime, n) );
-    r  = 1.7 * pow(t_prime, 0.12) + 8.0;
-    Q  = Qf * pow( ( 1. + pow( ( Qf / Z ), r ) ), -1. / r );
+    double C0 = q2 * Q + q3 * log(1. + pow(t / this->lambda0 - t_prime / this->lambda0, n) ) + q4 * log(t / t_prime);
 
-    C0 = q2 * Q + q3 *log( 1. + pow(t - t_prime, n) ) + q4 *log(t / t_prime);
-
-    return  ( q1 + C0 );
+    return q1 + C0;
 }
 
+
+double
+MPSMaterial :: giveEquivalentTime(GaussPoint *gp, TimeStep *tStep) const
+{
+    return this->computeEquivalentTime(gp, tStep, 0);
+}
 
 
 void
@@ -596,11 +590,6 @@ MPSMaterial :: computeCharTimes()
      * of the relaxation or creep function by the Dirichlet series
      */
 
-    int mu;
-    double Tau1;
-    int j;
-
-
     if ( this->begOfTimeOfInterest == -1. ) {
         this->begOfTimeOfInterest = 0.01 * lambda0;
     }
@@ -610,13 +599,13 @@ MPSMaterial :: computeCharTimes()
     }
 
     //first retardation time found in given by formula 0.3 * begOfTimeOfInterest
-    Tau1 = 0.3 * this->begOfTimeOfInterest;
+    double Tau1 = 0.3 * this->begOfTimeOfInterest;
 
     //last retardation time has to be bigger than 0.5 * endOfTimeOfInterest
     this->endOfTimeOfInterest = RheoChainMaterial :: giveEndOfTimeOfInterest();
 
-    j = 1;
-    while ( 0.5 * this->endOfTimeOfInterest >= Tau1 * pow( 10.0, ( double ) ( j - 1 ) ) ) {
+    int j = 1;
+    while ( 0.5 * this->endOfTimeOfInterest >= Tau1 * pow(10.0, ( double ) ( j - 1 ) ) ) {
         j++;
     }
 
@@ -625,42 +614,39 @@ MPSMaterial :: computeCharTimes()
     this->charTimes.resize(this->nUnits);
     this->charTimes.zero();
 
-    for ( mu = 1; mu <= this->nUnits; mu++ ) {
+    for ( int mu = 1; mu <= this->nUnits; mu++ ) {
         charTimes.at(mu) = Tau1 * pow(10., mu - 1);
     }
 }
 
 
-void
-MPSMaterial :: computeCharCoefficients(FloatArray &answer, double tPrime, GaussPoint *gp, TimeStep *tStep)
+FloatArray
+MPSMaterial :: computeCharCoefficients(double tPrime, GaussPoint *gp, TimeStep *tStep) const
 {
-    int mu;
-    double tau0, tauMu;
-
     // constant "n" is assumed to be equal to 0.1 (typical value)
 
     // modulus of elasticity of the first unit of Kelvin chain.
     // (aging elastic spring with retardation time = 0)
     double lambda0ToPowN = pow(lambda0, 0.1);
-    tau0 = pow(2 * this->giveCharTime(1) / sqrt(10.0), 0.1);
+    double tau0 = pow(2 * this->giveCharTime(1) / sqrt(10.0), 0.1);
     EspringVal = 1. / ( q2 * log(1.0 + tau0 / lambda0ToPowN) - q2 * tau0 / ( 10.0 * lambda0ToPowN + 10.0 * tau0 ) );
 
     // evaluation of moduli of elasticity for the remaining units
     // (Solidifying kelvin units with retardation times tauMu)
-    answer.resize(nUnits);
-    answer.zero();
-    for ( mu = 1; mu <= this->nUnits; mu++ ) {
-        tauMu = pow(2 * this->giveCharTime(mu), 0.1);
+    FloatArray answer(nUnits);
+    for ( int mu = 1; mu <= this->nUnits; mu++ ) {
+        double tauMu = pow(2 * this->giveCharTime(mu), 0.1);
         answer.at(mu) = 10. * pow(1 + tauMu / lambda0ToPowN, 2) / ( log(10.0) * q2 * ( tauMu / lambda0ToPowN ) * ( 0.9 + tauMu / lambda0ToPowN ) );
         this->charTimes.at(mu) *= 1.35;
     }
 
     answer.at(nUnits) /= 1.2;   // modulus of the last unit is reduced
+    return answer;
 }
 
 
 double
-MPSMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep)
+MPSMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep) const
 {
     /*
      * This function returns the incremental modulus for the given time increment.
@@ -681,19 +667,28 @@ MPSMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep)
     double Emodulus;
     MPSMaterialStatus *status = static_cast< MPSMaterialStatus * >( this->giveStatus(gp) );
 
-    if ( !this->isActivated(tStep) ) {
+    if ( !Material :: isActivated(tStep) ) {
         return 1.; // stresses are cancelled in giveRealStressVector;
     }
+
+    // check if the material AGE is positive in the middle of the time step
+    if ( tStep->isTheFirstStep() ||   ( !Material :: isActivated(tStep->givePreviousStep() ) ) ) {
+        double atAge = this->relMatAge - this->castingTime + ( tStep->giveTargetTime() - 0.5 * tStep->giveTimeIncrement() );
+        if ( atAge <= 0. ) {
+            OOFEM_ERROR("Attempting to evaluate stiffness at negative age: %f. Refine time steps or change material definition!\n", atAge);
+        }
+    }
+
 
     if ( status->giveStoredEmodulusFlag() ) {
         Emodulus = status->giveStoredEmodulus();
     } else {
         if ( EparVal.giveSize() == 0 ) {
-	  this->updateEparModuli(0., gp, tStep); // stiffnesses are time independent (evaluated at time t = 0.)
+            this->updateEparModuli(0., gp, tStep); // stiffnesses are time independent (evaluated at time t = 0.)
         }
 
         // contribution of the solidifying Kelving chain
-	sum = KelvinChainSolidMaterial :: giveEModulus(gp, tStep);
+        sum = KelvinChainSolidMaterial :: giveEModulus(gp, tStep);
 
         v = computeSolidifiedVolume(gp, tStep);
 
@@ -709,7 +704,7 @@ MPSMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep)
 
             // TRAPEZOIDAL INTEGRATION RULE
             // is the first time step or the material has been just activated (i.e. the previous time was less than casting time)
-            if ( tStep->isTheFirstStep() || ( tStep->giveIntrinsicTime() - tStep->giveTimeIncrement() - this->castingTime < 0. ) ) {
+            if ( tStep->isTheFirstStep() ||   ( !Material :: isActivated(tStep->givePreviousStep() ) ) ) {
                 //        if ( tStep->isTheFirstStep() ) {
                 etaR = this->giveInitViscosity(tStep) /  this->computePsiR(gp, tStep, 0);
             } else {
@@ -751,19 +746,17 @@ MPSMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep)
 
 
 double
-MPSMaterial :: computeSolidifiedVolume(GaussPoint *gp, TimeStep *tStep)
+MPSMaterial :: computeSolidifiedVolume(GaussPoint *gp, TimeStep *tStep) const
 // compute the relative volume of the solidified material at given age (in days)
 {
-    double m, alpha;
-    double atAge;     // (equivalent age)
-
     // standard values of exponents - empirical constants
-    m = 0.5;
+    double m = 0.5;
 
-    alpha = q3 / q2;
+    double alpha = q3 / q2;
 
+    double atAge;     // (equivalent age)
     if ( this->CoupledAnalysis == Basic ) {
-        atAge = relMatAge + ( tStep->giveTargetTime() - 0.5 * tStep->giveTimeIncrement() );
+        atAge = this->relMatAge - this->castingTime + ( tStep->giveTargetTime() - 0.5 * tStep->giveTimeIncrement() );
     } else {
         atAge = computeEquivalentTime(gp, tStep, 0);
     }
@@ -773,57 +766,45 @@ MPSMaterial :: computeSolidifiedVolume(GaussPoint *gp, TimeStep *tStep)
 
 
 double
-MPSMaterial :: computeBetaMu(GaussPoint *gp, TimeStep *tStep, int Mu)
+MPSMaterial :: computeBetaMu(GaussPoint *gp, TimeStep *tStep, int Mu) const
 {
-    double betaMu;
-    double deltaT;
-    double tauMu;
-
-    deltaT = tStep->giveTimeIncrement();
+    double deltaT = tStep->giveTimeIncrement();
 
     if ( ( this->CoupledAnalysis == MPS_full ) || ( this->CoupledAnalysis == MPS_humidity ) || ( this->CoupledAnalysis == MPS_temperature ) ) {
         deltaT *=  0.5 * ( this->computePsiR(gp, tStep, 0) + this->computePsiR(gp, tStep, 1) );
     }
 
-    tauMu = this->giveCharTime(Mu);
+    double tauMu = this->giveCharTime(Mu);
 
     if ( deltaT / tauMu > 30 ) {
-        betaMu = 0;
+        return 0;
     } else {
-        betaMu = exp(-( deltaT ) / tauMu);
+        return exp(-( deltaT ) / tauMu);
     }
-
-    return betaMu;
 }
 
 double
-MPSMaterial :: computeLambdaMu(GaussPoint *gp, TimeStep *tStep, int Mu)
+MPSMaterial :: computeLambdaMu(GaussPoint *gp, TimeStep *tStep, int Mu) const
 {
-    double lambdaMu;
-    double deltaT;
-    double tauMu;
-
-    deltaT = tStep->giveTimeIncrement();
+    double deltaT = tStep->giveTimeIncrement();
 
     if ( ( this->CoupledAnalysis == MPS_full ) || ( this->CoupledAnalysis == MPS_humidity ) || ( this->CoupledAnalysis == MPS_temperature ) ) {
         deltaT *=  0.5 * ( this->computePsiR(gp, tStep, 0) + this->computePsiR(gp, tStep, 1) );
     }
 
-    tauMu = this->giveCharTime(Mu);
+    double tauMu = this->giveCharTime(Mu);
 
     if ( deltaT / tauMu < 1.e-5 ) {
-        lambdaMu = 1 - 0.5 * ( deltaT / tauMu ) + 1 / 6 * ( pow(deltaT / tauMu, 2) ) - 1 / 24 * ( pow(deltaT / tauMu, 3) );
+        return 1 - 0.5 * ( deltaT / tauMu ) + 1 / 6 * ( pow(deltaT / tauMu, 2) ) - 1 / 24 * ( pow(deltaT / tauMu, 3) );
     } else if ( deltaT / tauMu > 30 ) {
-        lambdaMu = tauMu / deltaT;
+        return tauMu / deltaT;
     } else {
-        lambdaMu = ( 1.0 -  exp(-( deltaT ) / tauMu) ) * tauMu / deltaT;
+        return ( 1.0 -  exp(-( deltaT ) / tauMu) ) * tauMu / deltaT;
     }
-
-    return lambdaMu;
 }
 
 double
-MPSMaterial :: computeFlowTermViscosity(GaussPoint *gp, TimeStep *tStep)
+MPSMaterial :: computeFlowTermViscosity(GaussPoint *gp, TimeStep *tStep) const
 {
     double eta = 0., tHalfStep;
 
@@ -842,7 +823,7 @@ MPSMaterial :: computeFlowTermViscosity(GaussPoint *gp, TimeStep *tStep)
      */
 
     if ( this->CoupledAnalysis == Basic ) {
-        tHalfStep = relMatAge + ( tStep->giveTargetTime() - 0.5 * tStep->giveTimeIncrement() );
+        tHalfStep = this->relMatAge - this->castingTime + ( tStep->giveTargetTime() - 0.5 * tStep->giveTimeIncrement() );
         eta = tHalfStep / q4;
     } else if ( ( this->CoupledAnalysis == MPS_full ) || ( this->CoupledAnalysis == MPS_humidity ) || ( this->CoupledAnalysis == MPS_temperature ) ) {
         MPSMaterialStatus *status = static_cast< MPSMaterialStatus * >( this->giveStatus(gp) );
@@ -855,7 +836,7 @@ MPSMaterial :: computeFlowTermViscosity(GaussPoint *gp, TimeStep *tStep)
         } else {
             // the first time step or the material has been just activated (i.e. the previous time was less than casting time)
             //  ask for an initial value of viscosity
-            if ( tStep->isTheFirstStep() || ( tStep->giveIntrinsicTime() - tStep->giveTimeIncrement() - this->castingTime < 0. ) ) {
+            if ( tStep->isTheFirstStep() ||  ( !Material :: isActivated(tStep->givePreviousStep() ) ) ) {
                 prevEta = this->giveInitViscosity(tStep);
             } else {
                 // asks for the value of viscosity from the end of the last time-step
@@ -874,7 +855,7 @@ MPSMaterial :: computeFlowTermViscosity(GaussPoint *gp, TimeStep *tStep)
                 T_new = this->giveTemperature(gp, tStep, 1);
                 T_old = this->giveTemperature(gp, tStep, 0);
 
-                if ( ( status->giveTmax() - T_new <= 0. ) || tStep->isTheFirstStep() ||  ( tStep->giveIntrinsicTime() - tStep->giveTimeIncrement() - this->castingTime < 0. ) ) {
+                if ( ( status->giveTmax() - T_new <= 0. ) || tStep->isTheFirstStep() ||  ( !Material :: isActivated(tStep->givePreviousStep() ) ) ) {
                     status->setTmax(T_new);
                     kT = kTm;
                 } else {
@@ -888,17 +869,17 @@ MPSMaterial :: computeFlowTermViscosity(GaussPoint *gp, TimeStep *tStep)
 
                 if ( this->CoupledAnalysis == MPS_full ) {
                     if ( kTm == -1. ) {
-                        A = sqrt( muS * fabs( ( T_new + T_old ) * ( H_new - H_old ) / ( H_new + H_old ) + log( ( H_new + H_old ) / 2. ) * ( T_new - T_old ) ) / ( dt * this->roomTemperature ) );
+                        A = sqrt(muS * fabs( ( T_new + T_old ) * ( H_new - H_old ) / ( H_new + H_old ) + log( ( H_new + H_old ) / 2. ) * ( T_new - T_old ) ) / ( dt * this->roomTemperature ) );
                     } else {
-                        A = sqrt( muS * fabs( ( T_new + T_old ) * ( H_new - H_old ) / ( H_new + H_old ) - kT * ( T_new - T_old ) ) / ( dt * this->roomTemperature ) );
+                        A = sqrt(muS * fabs( ( T_new + T_old ) * ( H_new - H_old ) / ( H_new + H_old ) - kT * ( T_new - T_old ) ) / ( dt * this->roomTemperature ) );
                     }
                     B = sqrt(PsiS / this->q4);
                 } else if ( this->CoupledAnalysis == MPS_humidity ) {
                     // original version of the RHS for constant && room temperature
-                    A = sqrt(muS * ( fabs( log(H_new) - log(H_old) ) ) / dt);
+                    A = sqrt(muS * ( fabs(log(H_new) - log(H_old) ) ) / dt);
                     B = sqrt(PsiS / this->q4);
                 } else if ( this->CoupledAnalysis == MPS_temperature ) {
-                    A = sqrt( muS * fabs( kT * ( T_new - T_old ) ) / ( dt * this->roomTemperature ) );
+                    A = sqrt(muS * fabs(kT * ( T_new - T_old ) ) / ( dt * this->roomTemperature ) );
                     B = sqrt(PsiS / this->q4);
                 } else {
                     OOFEM_ERROR("mode is not supported");
@@ -919,16 +900,16 @@ MPSMaterial :: computeFlowTermViscosity(GaussPoint *gp, TimeStep *tStep)
 
                 if ( this->CoupledAnalysis == MPS_full ) {
                     if ( kTm == -1. ) {
-                        A =  pow( muS, 1. / ( p - 1. ) ) * fabs( ( T_new + T_old ) * ( H_new - H_old ) / ( H_new + H_old ) + log( ( H_new + H_old ) / 2. ) * ( T_new - T_old ) ) / ( dt * this->roomTemperature );
+                        A =  pow(muS, 1. / ( p - 1. ) ) * fabs( ( T_new + T_old ) * ( H_new - H_old ) / ( H_new + H_old ) + log( ( H_new + H_old ) / 2. ) * ( T_new - T_old ) ) / ( dt * this->roomTemperature );
                     } else {
-                        A =  pow( muS, 1. / ( p - 1. ) ) * fabs( ( T_new + T_old ) * ( H_new - H_old ) / ( H_new + H_old ) - kT * ( T_new - T_old ) ) / ( dt * this->roomTemperature );
+                        A =  pow(muS, 1. / ( p - 1. ) ) * fabs( ( T_new + T_old ) * ( H_new - H_old ) / ( H_new + H_old ) - kT * ( T_new - T_old ) ) / ( dt * this->roomTemperature );
                     }
                     B = PsiS / this->q4;
                 } else if ( this->CoupledAnalysis == MPS_humidity ) {
-                    A =  pow( muS, 1. / ( p - 1. ) ) * ( fabs( log(H_new) - log(H_old) ) ) / dt;
+                    A =  pow(muS, 1. / ( p - 1. ) ) * ( fabs(log(H_new) - log(H_old) ) ) / dt;
                     B = PsiS / this->q4;
                 } else if ( this->CoupledAnalysis == MPS_temperature ) {
-                    A =  pow( muS, 1. / ( p - 1. ) ) * fabs( kT * ( T_new - T_old ) ) / ( dt * this->roomTemperature );
+                    A =  pow(muS, 1. / ( p - 1. ) ) * fabs(kT * ( T_new - T_old ) ) / ( dt * this->roomTemperature );
                     B = PsiS / this->q4;
                 } else {
                     OOFEM_ERROR("mode is not supported");
@@ -940,8 +921,8 @@ MPSMaterial :: computeFlowTermViscosity(GaussPoint *gp, TimeStep *tStep)
                 double relError = 1.;
 
                 while ( relError  > iterTol ) {
-                    f = deltaEta / dt + A *pow( prevEta + 0.5 *deltaEta, p / ( p - 1. ) ) - B;
-                    df = 1 / dt + A *p *pow( prevEta + 0.5 *deltaEta, 1. / ( p - 1. ) ) / ( 2. * ( p - 1. ) );
+                    f = deltaEta / dt + A * pow(prevEta + 0.5 * deltaEta, p / ( p - 1. ) ) - B;
+                    df = 1 / dt + A * p * pow(prevEta + 0.5 * deltaEta, 1. / ( p - 1. ) ) / ( 2. * ( p - 1. ) );
 
                     deltaDeltaEta = -f / df;
                     deltaEta += deltaDeltaEta;
@@ -964,17 +945,17 @@ MPSMaterial :: computeFlowTermViscosity(GaussPoint *gp, TimeStep *tStep)
 
                 if ( this->CoupledAnalysis == MPS_full ) {
                     if ( kTm == -1. ) {
-                        A =  pow( muS, 1. / ( p - 1. ) ) * fabs( T_new * log(H_new) - T_old * log(H_old) ) / ( dt * this->roomTemperature );
+                        A =  pow(muS, 1. / ( p - 1. ) ) * fabs(T_new * log(H_new) - T_old * log(H_old) ) / ( dt * this->roomTemperature );
                     } else {
-                        A =  ( kT * fabs(T_new - T_old) + 0.5 * ( T_new + T_old ) * fabs( log(H_new) - log(H_old) ) ) * pow( muS, 1. / ( p - 1. ) ) /  ( dt * this->roomTemperature );
+                        A =  ( kT * fabs(T_new - T_old) + 0.5 * ( T_new + T_old ) * fabs(log(H_new) - log(H_old) ) ) * pow(muS, 1. / ( p - 1. ) ) /  ( dt * this->roomTemperature );
                     }
 
                     B = PsiS / this->q4;
                 } else if ( this->CoupledAnalysis == MPS_humidity ) {
-                    A =  ( fabs( log(H_new) - log(H_old) ) ) * pow( muS, 1. / ( p - 1. ) ) /  dt;
+                    A =  ( fabs(log(H_new) - log(H_old) ) ) * pow(muS, 1. / ( p - 1. ) ) /  dt;
                     B = PsiS / this->q4;
                 } else if ( this->CoupledAnalysis == MPS_temperature ) {
-                    A =  kT * fabs(T_new - T_old) * pow( muS, 1. / ( p - 1. ) ) /  ( dt * this->roomTemperature );
+                    A =  kT * fabs(T_new - T_old) * pow(muS, 1. / ( p - 1. ) ) /  ( dt * this->roomTemperature );
                     B = PsiS / this->q4;
                 } else {
                     OOFEM_ERROR("mode is not supported");
@@ -987,8 +968,8 @@ MPSMaterial :: computeFlowTermViscosity(GaussPoint *gp, TimeStep *tStep)
                 double minEta = 1.e-6;
 
                 while ( relError  > iterTol ) {
-                    f = deltaEta / dt + A *pow( prevEta + deltaEta, p / ( p - 1. ) )  - B;
-                    df = 1 / dt + A *pow( prevEta + deltaEta, 1. / ( p - 1. ) ) * p / ( p - 1. );
+                    f = deltaEta / dt + A * pow(prevEta + deltaEta, p / ( p - 1. ) )  - B;
+                    df = 1 / dt + A * pow(prevEta + deltaEta, 1. / ( p - 1. ) ) * p / ( p - 1. );
 
                     deltaDeltaEta = -f / df;
                     deltaEta += deltaDeltaEta;
@@ -1012,16 +993,16 @@ MPSMaterial :: computeFlowTermViscosity(GaussPoint *gp, TimeStep *tStep)
                 if ( this->CoupledAnalysis == MPS_full ) {
                     // original version of the RHS for variable/elevated temperature
                     if ( kTm == -1. ) {
-                        A =  k3 * fabs( T_new * log(H_new) - T_old * log(H_old) ) / ( dt * this->roomTemperature );
+                        A =  k3 * fabs(T_new * log(H_new) - T_old * log(H_old) ) / ( dt * this->roomTemperature );
                     } else {
-                        A =  k3 * ( kT * fabs(T_new - T_old) + 0.5 * ( T_new + T_old ) * fabs( log(H_new) - log(H_old) ) ) / ( dt * this->roomTemperature );
+                        A =  k3 * ( kT * fabs(T_new - T_old) + 0.5 * ( T_new + T_old ) * fabs(log(H_new) - log(H_old) ) ) / ( dt * this->roomTemperature );
                     }
 
                     B = PsiS / this->q4;
                 } else if ( this->CoupledAnalysis == MPS_humidity ) {
                     // original version of the RHS for constant && room temperature
                     // compiler warning:
-                    A =  k3 * ( fabs( log(H_new) - log(H_old) ) ) / dt;
+                    A =  k3 * ( fabs(log(H_new) - log(H_old) ) ) / dt;
                     B = PsiS / this->q4;
                 } else if ( this->CoupledAnalysis == MPS_temperature ) {
                     A =  k3 * kT * fabs(T_new - T_old) / ( dt * this->roomTemperature );
@@ -1063,7 +1044,7 @@ MPSMaterial :: computeFlowTermViscosity(GaussPoint *gp, TimeStep *tStep)
 
 // returns initial value of the flow term viscosity
 double
-MPSMaterial :: giveInitViscosity(TimeStep *tStep)
+MPSMaterial :: giveInitViscosity(TimeStep *tStep) const
 {
     if ( ( t0 - tStep->giveTimeIncrement() ) <= 0. ) {
         OOFEM_ERROR("length of the first time step increment %e must be smaller than t0 %e", tStep->giveTimeIncrement(), t0);
@@ -1074,7 +1055,7 @@ MPSMaterial :: giveInitViscosity(TimeStep *tStep)
 
 
 void
-MPSMaterial :: giveEigenStrainVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep, ValueModeType mode)
+MPSMaterial :: giveEigenStrainVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep, ValueModeType mode) const
 //
 // computes the strain due to creep at constant stress during the increment
 // (in fact, the INCREMENT of creep strain is computed for mode == VM_Incremental)
@@ -1105,7 +1086,7 @@ MPSMaterial :: giveEigenStrainVector(FloatArray &answer, GaussPoint *gp, TimeSte
             // TRAPEZOIDAL INTEGRATION RULE
             //            if ( tStep->isTheFirstStep() ) {
             // is the first time step or the material has been just activated (i.e. the previous time was less than casting time)
-            if ( tStep->isTheFirstStep() || ( tStep->giveIntrinsicTime() - tStep->giveTimeIncrement() - this->castingTime < 0. ) ) {
+            if ( tStep->isTheFirstStep() ||  ( !Material :: isActivated(tStep->givePreviousStep() ) ) ) {
                 etaR = this->giveInitViscosity(tStep) / this->computePsiR(gp, tStep, 0);
             } else {
                 etaR = status->giveFlowTermViscosity() / this->computePsiR(gp, tStep, 0);
@@ -1142,25 +1123,28 @@ MPSMaterial :: giveEigenStrainVector(FloatArray &answer, GaussPoint *gp, TimeSte
 #ifdef keep_track_of_strains
         status->setCreepStrainIncrement(answer);
 #endif
-
     } else {
-        /* error - total mode not implemented yet */
-        OOFEM_ERROR("mode is not supported");
+#ifndef keep_track_of_strains
+        OOFEM_ERROR("for total formulation of shrinkage strains need to define keep_track_of_strains");
+#else
+        answer = status->giveCreepStrain();
+        this->giveEigenStrainVector(reducedAnswer, gp, tStep, VM_Incremental);
+        answer.add(reducedAnswer);
+        return;
+
+#endif
     }
 }
 
 
 void
-MPSMaterial :: computePointShrinkageStrainVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep)
+MPSMaterial :: computePointShrinkageStrainVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep) const
 {
     /* dEpsSh/dt = kSh * dh/dt   (h = humidity)
      * ->> EpsSh = kSh * h_difference
      */
-    double humDiff, EpsSh;
     int size;
-    FloatArray fullAnswer;
     MaterialMode mMode = gp->giveMaterialMode();
-    double h, kShFactor;
 
     if ( ( mMode == _3dShell ) || ( mMode ==  _3dBeam ) || ( mMode == _2dPlate ) || ( mMode == _2dBeam ) ) {
         size = 12;
@@ -1168,19 +1152,34 @@ MPSMaterial :: computePointShrinkageStrainVector(FloatArray &answer, GaussPoint 
         size = 6;
     }
 
+    double kShFactor = 1.;
     if ( this->sh_a != 1. ) {
-        h = this->giveHumidity(gp, tStep, 2);
+        double h = this->giveHumidity(gp, tStep, 2);
         kShFactor =  sh_a + ( 1. - sh_a ) / ( 1. + pow( ( 1. - h ) / ( 1. - sh_hC ), sh_n ) );
-    } else {
-        kShFactor = 1.;
     }
 
-    humDiff = this->giveHumidity(gp, tStep, 3);
 
-    EpsSh = humDiff * kSh * kShFactor;
+    if ( ksh_h.giveSize() >= 2 ) {
+        double h = this->giveHumidity(gp, tStep, 2);
+        double tol = 1.e-10;
+        for ( int i = 2; i <= ksh_h.giveSize(); i++ ) {
+            if ( ( h - ksh_h.at(i) ) < tol ) {
+                kShFactor *=  ksh_fh.at(i - 1) + ( h - ksh_h.at(i - 1) ) * ( ksh_fh.at(i) - ksh_fh.at(i - 1) ) / ( ksh_h.at(i) - ksh_h.at(i - 1) );
+                break;
+            }
+        }
+    }
 
-    fullAnswer.resize(size);
-    fullAnswer.zero();
+    if ( this->timeDependent_ksh ) {
+        double te = this->computeEquivalentTime(gp, tStep, 0);
+        kShFactor *= MPSMaterial :: computeCreepFunction(te + 0.01 * this->lambda0, te, gp, tStep) / MPSMaterial :: computeCreepFunction(28.01 * this->lambda0, 28. * this->lambda0, gp, tStep);
+    }
+
+    double humDiff = this->giveHumidity(gp, tStep, 3);
+
+    double EpsSh = humDiff * kSh * kShFactor;
+
+    FloatArray fullAnswer(size);
 
     if ( ( mMode ==  _2dLattice ) || ( mMode ==  _3dLattice ) ) {
         fullAnswer.at(1) = EpsSh;
@@ -1188,11 +1187,11 @@ MPSMaterial :: computePointShrinkageStrainVector(FloatArray &answer, GaussPoint 
         fullAnswer.at(1) = fullAnswer.at(2) = fullAnswer.at(3) = EpsSh;
     }
 
-    StructuralMaterial :: giveReducedSymVectorForm( answer, fullAnswer, gp->giveMaterialMode() );
+    StructuralMaterial :: giveReducedSymVectorForm(answer, fullAnswer, gp->giveMaterialMode() );
 }
 
 void
-MPSMaterial :: computeFibAutogenousShrinkageStrainVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep)
+MPSMaterial :: computeFibAutogenousShrinkageStrainVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep) const
 {
     /* from fib MC 2010: equations 5.1-76, 5.1-79
      * eps_cas(t) = eps_cas0 * beta_as(t)
@@ -1201,14 +1200,8 @@ MPSMaterial :: computeFibAutogenousShrinkageStrainVector(FloatArray &answer, Gau
      * ->> d_eps_cas(t) = eps_cas0 * [ -exp(-0.2 * sqrt(t_e_n+1) ) + exp(-0.2 * sqrt(t_e_n) ) ]
      */
 
-    double eps_cas;
-
     int size;
-    FloatArray fullAnswer;
     MaterialMode mMode = gp->giveMaterialMode();
-
-    double t_equiv_beg, t_equiv_end;
-
 
     if ( ( mMode == _3dShell ) || ( mMode ==  _3dBeam ) || ( mMode == _2dPlate ) || ( mMode == _2dBeam ) ) {
         size = 12;
@@ -1216,11 +1209,11 @@ MPSMaterial :: computeFibAutogenousShrinkageStrainVector(FloatArray &answer, Gau
         size = 6;
     }
 
-
+    double t_equiv_beg, t_equiv_end;
     //    if ( tStep->isTheFirstStep() ) {
     // is the first time step or the material has been just activated (i.e. the previous time was less than casting time)
-    if ( tStep->isTheFirstStep() || ( tStep->giveIntrinsicTime() - tStep->giveTimeIncrement() - this->castingTime < 0. ) ) {
-        t_equiv_beg = relMatAge - tStep->giveTimeIncrement();
+    if ( tStep->isTheFirstStep() ||  (  !Material :: isActivated(tStep->givePreviousStep() ) ) ) {
+        t_equiv_beg = this->relMatAge - tStep->giveTimeIncrement();
     } else {
         MPSMaterialStatus *status = static_cast< MPSMaterialStatus * >( this->giveStatus(gp) );
         t_equiv_beg = status->giveEquivalentTime();
@@ -1232,10 +1225,9 @@ MPSMaterial :: computeFibAutogenousShrinkageStrainVector(FloatArray &answer, Gau
     // time must be converted into days
     t_equiv_end /= this->lambda0;
 
-    eps_cas = eps_cas0 * ( -exp( -0.2 * sqrt(t_equiv_end) ) + exp( -0.2 * sqrt(t_equiv_beg) ) );
+    double eps_cas = eps_cas0 * ( -exp(-0.2 * sqrt(t_equiv_end) ) + exp(-0.2 * sqrt(t_equiv_beg) ) );
 
-    fullAnswer.resize(size);
-    fullAnswer.zero();
+    FloatArray fullAnswer(size);
 
     if ( ( mMode ==  _2dLattice ) || ( mMode ==  _3dLattice ) ) {
         fullAnswer.at(1) = eps_cas;
@@ -1243,13 +1235,12 @@ MPSMaterial :: computeFibAutogenousShrinkageStrainVector(FloatArray &answer, Gau
         fullAnswer.at(1) = fullAnswer.at(2) = fullAnswer.at(3) = eps_cas;
     }
 
-
-    StructuralMaterial :: giveReducedSymVectorForm( answer, fullAnswer, gp->giveMaterialMode() );
+    StructuralMaterial :: giveReducedSymVectorForm(answer, fullAnswer, gp->giveMaterialMode() );
 }
 
 
 void
-MPSMaterial :: computeB4AutogenousShrinkageStrainVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep)
+MPSMaterial :: computeB4AutogenousShrinkageStrainVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep) const
 {
     /* from Bazant's B4 model (ver. Dec 2014): equations 23-25 and Table 2
      * eps_au(t) = eps_au_infty * [ 1 + (tau_au / t_eq)^alpha ]^r_t
@@ -1257,14 +1248,8 @@ MPSMaterial :: computeB4AutogenousShrinkageStrainVector(FloatArray &answer, Gaus
      * eps_au_infty = -eps_au_cem * (ac/6)^r_ea * (wc/0.38)^r_ew
      * tau_au = tau_au_cem * (wc/0.38)^r_tw
      */
-
-    double eps_au;
-
     int size;
-    FloatArray fullAnswer;
     MaterialMode mMode = gp->giveMaterialMode();
-
-    double t_equiv_beg, t_equiv_end;
 
     if ( ( mMode == _3dShell ) || ( mMode ==  _3dBeam ) || ( mMode == _2dPlate ) || ( mMode == _2dBeam ) ) {
         size = 12;
@@ -1272,11 +1257,10 @@ MPSMaterial :: computeB4AutogenousShrinkageStrainVector(FloatArray &answer, Gaus
         size = 6;
     }
 
-    //    if ( tStep->isTheFirstStep() ) {
-
     // is the first time step or the material has been just activated (i.e. the previous time was less than casting time)
-    if ( tStep->isTheFirstStep() || ( tStep->giveIntrinsicTime() - tStep->giveTimeIncrement() - this->castingTime < 0. ) ) {
-        t_equiv_beg = relMatAge - tStep->giveTimeIncrement();
+    double t_equiv_beg, t_equiv_end;
+    if ( tStep->isTheFirstStep() ||  ( !Material :: isActivated(tStep->givePreviousStep() ) ) ) {
+        t_equiv_beg = this->relMatAge - tStep->giveTimeIncrement();
     } else {
         MPSMaterialStatus *status = static_cast< MPSMaterialStatus * >( this->giveStatus(gp) );
         t_equiv_beg = status->giveEquivalentTime();
@@ -1284,10 +1268,9 @@ MPSMaterial :: computeB4AutogenousShrinkageStrainVector(FloatArray &answer, Gaus
 
     t_equiv_end = this->computeEquivalentTime(gp, tStep, 1);
     //  t_equiv_beg, t_equiv_end and b4_tau_au are in time-units of the analysis
-    eps_au = b4_eps_au_infty * ( pow(1. + pow(b4_tau_au / t_equiv_end, b4_alpha), b4_r_t) -  pow(1. + pow(b4_tau_au / t_equiv_beg, b4_alpha), b4_r_t) );
+    double eps_au = b4_eps_au_infty * ( pow(1. + pow(b4_tau_au / t_equiv_end, b4_alpha), b4_r_t) -  pow(1. + pow(b4_tau_au / t_equiv_beg, b4_alpha), b4_r_t) );
 
-    fullAnswer.resize(size);
-    fullAnswer.zero();
+    FloatArray fullAnswer(size);
 
     if ( ( mMode ==  _2dLattice ) || ( mMode ==  _3dLattice ) ) {
         fullAnswer.at(1) = eps_au;
@@ -1295,13 +1278,13 @@ MPSMaterial :: computeB4AutogenousShrinkageStrainVector(FloatArray &answer, Gaus
         fullAnswer.at(1) = fullAnswer.at(2) = fullAnswer.at(3) = eps_au;
     }
 
-
-    StructuralMaterial :: giveReducedSymVectorForm( answer, fullAnswer, gp->giveMaterialMode() );
+    StructuralMaterial :: giveReducedSymVectorForm(answer, fullAnswer, gp->giveMaterialMode() );
 }
 
 
-// double
-// MPSMaterial :: inverse_sorption_isotherm(double w)
+#if 0
+double
+MPSMaterial :: inverse_sorption_isotherm const
 // Function calculates relative humidity from water content (inverse relation form sorption isotherm).
 // Relative humidity (phi) is from range 0.2 - 0.98 !!!
 // sorption isotherm by C. R. Pedersen (1990), Combined heat and moisture transfer in building constructions,
@@ -1309,21 +1292,22 @@ MPSMaterial :: computeB4AutogenousShrinkageStrainVector(FloatArray &answer, Gaus
 // w (kg/kg) ... water content
 // phi ... relative humidity
 // w_h, n, a ... constants obtained from experiments
-//{
-// relative humidity
-//   double phi = exp( a * ( 1.0 - pow( ( w_h / w ), ( n ) ) ) );
-//
-//   /*if ( ( phi < 0.2 ) || ( phi > 0.98 ) ) {
-//     * OOFEM_ERROR("Relative humidity h = %e (w=%e) is out of range", phi, w);
-//     * }*/
-//   //if ( phi < 0.20 ){ phi = 0.2;}
-//    //if ( phi > 0.98 ){ phi = 0.98;}
-//
-//   return phi;
-//}
+{
+    //relative humidity
+    double phi = exp(a * ( 1.0 - pow( ( w_h / w ), ( n ) ) ) );
+
+    /*if ( ( phi < 0.2 ) || ( phi > 0.98 ) ) {
+     * OOFEM_ERROR("Relative humidity h = %e (w=%e) is out of range", phi, w);
+     * }*/
+    //if ( phi < 0.20 ){ phi = 0.2;}
+    //if ( phi > 0.98 ){ phi = 0.98;}
+
+    return phi;
+}
+#endif
 
 double
-MPSMaterial :: giveHumidity(GaussPoint *gp, TimeStep *tStep, int option)
+MPSMaterial :: giveHumidity(GaussPoint *gp, TimeStep *tStep, int option) const
 {
     double H_tot = 0.0, H_inc = 0.0;
 
@@ -1339,7 +1323,7 @@ MPSMaterial :: giveHumidity(GaussPoint *gp, TimeStep *tStep, int option)
         FloatArray et2, ei2; // total and incremental values of water mass
 
         if ( ( tf = fm->giveField(FT_HumidityConcentration) ) ) {
-            gp->giveElement()->computeGlobalCoordinates( gcoords, gp->giveNaturalCoordinates() );
+            gp->giveElement()->computeGlobalCoordinates(gcoords, gp->giveNaturalCoordinates() );
             if ( ( err = tf->evaluateAt(et2, gcoords, VM_Total, tStep) ) ) {
                 OOFEM_ERROR("tf->evaluateAt failed, error value %d", err);
             }
@@ -1384,7 +1368,7 @@ MPSMaterial :: giveHumidity(GaussPoint *gp, TimeStep *tStep, int option)
 }
 
 double
-MPSMaterial :: giveTemperature(GaussPoint *gp, TimeStep *tStep, int option)
+MPSMaterial :: giveTemperature(GaussPoint *gp, TimeStep *tStep, int option) const
 {
     double T_tot = 0.0, T_inc = 0.0;
     MPSMaterialStatus *status = static_cast< MPSMaterialStatus * >( this->giveStatus(gp) );
@@ -1399,7 +1383,7 @@ MPSMaterial :: giveTemperature(GaussPoint *gp, TimeStep *tStep, int option)
         FloatArray et1, ei1; // total and incremental values of temperature
 
         if ( ( tf = fm->giveField(FT_Temperature) ) ) {
-            gp->giveElement()->computeGlobalCoordinates( gcoords, gp->giveNaturalCoordinates() );
+            gp->giveElement()->computeGlobalCoordinates(gcoords, gp->giveNaturalCoordinates() );
             if ( ( err = tf->evaluateAt(et1, gcoords, VM_Total, tStep) ) ) {
                 OOFEM_ERROR("tf->evaluateAt failed, error value %d", err);
             }
@@ -1442,24 +1426,21 @@ MPSMaterial :: giveTemperature(GaussPoint *gp, TimeStep *tStep, int option)
 }
 
 double
-MPSMaterial :: computePsiR(GaussPoint *gp, TimeStep *tStep, int option)
+MPSMaterial :: computePsiR(GaussPoint *gp, TimeStep *tStep, int option) const
 {
-    double H, T;
-    double betaRH, betaRT;
-
     if ( this->CoupledAnalysis == MPS_humidity ) {
-        H = this->giveHumidity(gp, tStep, option);
-        betaRH = alphaR + ( 1. - alphaR ) * H * H;
+        double H = this->giveHumidity(gp, tStep, option);
+        double betaRH = alphaR + ( 1. - alphaR ) * H * H;
         return betaRH;
     } else if ( this->CoupledAnalysis == MPS_temperature ) {
-        T = this->giveTemperature(gp, tStep, option);
-        betaRT = exp( QRtoR * ( 1. / this->roomTemperature - 1. / T ) );
+        double T = this->giveTemperature(gp, tStep, option);
+        double betaRT = exp(QRtoR * ( 1. / this->roomTemperature - 1. / T ) );
         return betaRT;
     } else if ( this->CoupledAnalysis == MPS_full ) {
-        H = this->giveHumidity(gp, tStep, option);
-        T = this->giveTemperature(gp, tStep, option);
-        betaRH = alphaR + ( 1. - alphaR ) * H * H;
-        betaRT = exp( QRtoR * ( 1. / this->roomTemperature - 1. / T ) );
+        double H = this->giveHumidity(gp, tStep, option);
+        double T = this->giveTemperature(gp, tStep, option);
+        double betaRH = alphaR + ( 1. - alphaR ) * H * H;
+        double betaRT = exp(QRtoR * ( 1. / this->roomTemperature - 1. / T ) );
         return betaRH * betaRT;
     } else {
         OOFEM_ERROR("mode is not supported");
@@ -1468,24 +1449,21 @@ MPSMaterial :: computePsiR(GaussPoint *gp, TimeStep *tStep, int option)
 }
 
 double
-MPSMaterial :: computePsiS(GaussPoint *gp, TimeStep *tStep)
+MPSMaterial :: computePsiS(GaussPoint *gp, TimeStep *tStep) const
 {
-    double AverageHum, AverageTemp;
-    double betaSH, betaST;
-
     if ( this->CoupledAnalysis == MPS_humidity ) {
-        AverageHum = this->giveHumidity(gp, tStep, 2);
-        betaSH = alphaS + ( 1. - alphaS ) * AverageHum * AverageHum;
+        double AverageHum = this->giveHumidity(gp, tStep, 2);
+        double betaSH = alphaS + ( 1. - alphaS ) * AverageHum * AverageHum;
         return betaSH;
     } else if ( this->CoupledAnalysis == MPS_temperature ) {
-        AverageTemp = this->giveTemperature(gp, tStep, 2);
-        betaST = exp( QStoR * ( 1. / this->roomTemperature - 1. /  AverageTemp ) );
+        double AverageTemp = this->giveTemperature(gp, tStep, 2);
+        double betaST = exp(QStoR * ( 1. / this->roomTemperature - 1. /  AverageTemp ) );
         return betaST;
     } else if ( this->CoupledAnalysis == MPS_full ) {
-        AverageHum = this->giveHumidity(gp, tStep, 2);
-        AverageTemp = this->giveTemperature(gp, tStep, 2);
-        betaSH = alphaS + ( 1. - alphaS ) * AverageHum * AverageHum;
-        betaST = exp( QStoR * ( 1. / this->roomTemperature - 1. /  AverageTemp ) );
+        double AverageHum = this->giveHumidity(gp, tStep, 2);
+        double AverageTemp = this->giveTemperature(gp, tStep, 2);
+        double betaSH = alphaS + ( 1. - alphaS ) * AverageHum * AverageHum;
+        double betaST = exp(QStoR * ( 1. / this->roomTemperature - 1. /  AverageTemp ) );
         return betaSH * betaST;
     } else {
         OOFEM_ERROR("mode is not supported");
@@ -1494,24 +1472,21 @@ MPSMaterial :: computePsiS(GaussPoint *gp, TimeStep *tStep)
 }
 
 double
-MPSMaterial :: computePsiE(GaussPoint *gp, TimeStep *tStep)
+MPSMaterial :: computePsiE(GaussPoint *gp, TimeStep *tStep) const
 {
-    double AverageHum, AverageTemp;
-    double betaEH, betaET;
-
     if ( this->CoupledAnalysis == MPS_humidity ) {
-        AverageHum = this->giveHumidity(gp, tStep, 2);
-        betaEH = 1. / ( 1. +  pow( ( alphaE * ( 1. - AverageHum ) ), 4. ) );
+        double AverageHum = this->giveHumidity(gp, tStep, 2);
+        double betaEH = 1. / ( 1. +  pow( ( alphaE * ( 1. - AverageHum ) ), 4. ) );
         return betaEH;
     } else if ( this->CoupledAnalysis == MPS_temperature ) {
-        AverageTemp = this->giveTemperature(gp, tStep, 2);
-        betaET = exp( QEtoR * ( 1. /  this->roomTemperature - 1. / AverageTemp ) );
+        double AverageTemp = this->giveTemperature(gp, tStep, 2);
+        double betaET = exp(QEtoR * ( 1. /  this->roomTemperature - 1. / AverageTemp ) );
         return betaET;
     } else if ( this->CoupledAnalysis == MPS_full ) {
-        AverageHum = this->giveHumidity(gp, tStep, 2);
-        AverageTemp = this->giveTemperature(gp, tStep, 2);
-        betaEH = 1. / ( 1. +  pow( ( alphaE * ( 1. - AverageHum ) ), 4. ) );
-        betaET = exp( QEtoR * ( 1. /  this->roomTemperature - 1. / AverageTemp ) );
+        double AverageHum = this->giveHumidity(gp, tStep, 2);
+        double AverageTemp = this->giveTemperature(gp, tStep, 2);
+        double betaEH = 1. / ( 1. +  pow( ( alphaE * ( 1. - AverageHum ) ), 4. ) );
+        double betaET = exp(QEtoR * ( 1. /  this->roomTemperature - 1. / AverageTemp ) );
         return betaEH * betaET;
     } else {
         OOFEM_ERROR(" mode is not supported");
@@ -1521,37 +1496,39 @@ MPSMaterial :: computePsiE(GaussPoint *gp, TimeStep *tStep)
 
 
 double
-MPSMaterial :: computeEquivalentTime(GaussPoint *gp, TimeStep *tStep, int option)
+MPSMaterial :: computeEquivalentTime(GaussPoint *gp, TimeStep *tStep, int option) const
 {
-    double tEquiv = 0.;
-    double PsiE;
+    double PsiE = 1.;
 
-    PsiE = computePsiE(gp, tStep);
+    if ( ( this->CoupledAnalysis == MPS_full ) || ( this->CoupledAnalysis == MPS_humidity ) ||
+         ( this->CoupledAnalysis == MPS_temperature ) ) {
+        PsiE = computePsiE(gp, tStep);
+    }
 
     // is the first time step or the material has been just activated (i.e. the previous time was less than casting time)
-    if ( tStep->isTheFirstStep() || ( tStep->giveIntrinsicTime() - tStep->giveTimeIncrement() - this->castingTime < 0. ) ) {
+    if ( tStep->isTheFirstStep() ||  ( !Material :: isActivated(tStep->givePreviousStep() ) ) ) {
         if ( option == 0 ) { // gives time in the middle of the timestep
-            return relMatAge - tStep->giveTimeIncrement() + PsiE * ( 0.5 * tStep->giveTimeIncrement() );
+            return this->relMatAge - tStep->giveTimeIncrement() + PsiE * ( 0.5 * tStep->giveTimeIncrement() );
         } else if ( option == 1 ) { // gives time in the end of the timestep - for UPDATING
-            return relMatAge - tStep->giveTimeIncrement() + PsiE *tStep->giveTimeIncrement();
+            return this->relMatAge - tStep->giveTimeIncrement() + PsiE * tStep->giveTimeIncrement();
         } else {
-            OOFEM_ERROR("mode is not supported")
+            OOFEM_ERROR("mode is not supported");
+            return 0.;
         }
     } else {
         MPSMaterialStatus *status = static_cast< MPSMaterialStatus * >( this->giveStatus(gp) );
-        tEquiv = status->giveEquivalentTime();
+        double tEquiv = status->giveEquivalentTime();
 
         if ( option == 0 ) { // gives time in the middle of the timestep
-            tEquiv = tEquiv + PsiE *  0.5 * tStep->giveTimeIncrement();
+            tEquiv += PsiE *  0.5 * tStep->giveTimeIncrement();
         } else if ( option == 1 ) { // gives time on the end of the timestep - for UPDATING
-            tEquiv = tEquiv + PsiE *tStep->giveTimeIncrement();
+            tEquiv += PsiE * tStep->giveTimeIncrement();
         } else {
             OOFEM_ERROR("mode is not supported")
         }
 
         return tEquiv;
     }
-    return tEquiv; // happy compiler
 }
 
 
@@ -1575,8 +1552,13 @@ MPSMaterial :: giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType
         answer.at(1) = answer.at(2) = answer.at(3) = status->giveAutogenousShrinkageStrain() + status->giveDryingShrinkageStrain();
         return 1;
     } else if ( type == IST_CreepStrainTensor ) {
-        StructuralMaterial :: giveFullSymVectorForm( answer, status->giveCreepStrain(), gp->giveMaterialMode() );
-
+        StructuralMaterial :: giveFullSymVectorForm(answer, status->giveCreepStrain(), gp->giveMaterialMode() );
+        return 1;
+    } else if ( type == IST_IncrementCreepModulus ) {
+        answer.resize(1);
+        answer.zero();
+        answer.at(1) = giveEModulus(gp, tStep);
+        status->giveStoredEmodulus();
         return 1;
     } else {
         return RheoChainMaterial :: giveIPValue(answer, gp, type, tStep);

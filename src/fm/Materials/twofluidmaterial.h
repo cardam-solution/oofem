@@ -38,8 +38,10 @@
 #include "fm/Materials/fluiddynamicmaterial.h"
 #include "intarray.h"
 #include "matstatus.h"
+#include "gausspoint.h"
 
 #include <memory>
+#include <array>
 
 ///@name Input fields for TwoFluidMaterial
 //@{
@@ -48,7 +50,6 @@
 //@}
 
 namespace oofem {
-class GaussPoint;
 
 /**
  * Material coupling the behavior of two particular materials based on
@@ -66,17 +67,15 @@ public:
      * @param d Domain to which new material will belong.
      */
     TwoFluidMaterial(int n, Domain * d) : FluidDynamicMaterial(n, d) { }
-    /// Destructor.
-    virtual ~TwoFluidMaterial() { }
 
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
     void giveInputRecord(DynamicInputRecord &input) override;
 
-    void computeDeviatoricStress3D(FloatArray &answer, GaussPoint *gp, const FloatArray &eps, TimeStep *tStep) override;
-    void computeTangent3D(FloatMatrix &answer, MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) override;
+    FloatArrayF<6> computeDeviatoricStress3D(const FloatArrayF<6> &answer, GaussPoint *gp, TimeStep *tStep) const override;
+    FloatMatrixF<6,6> computeTangent3D(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const override;
 
-    double giveEffectiveViscosity(GaussPoint *gp, TimeStep *tStep) override;
-    double give(int aProperty, GaussPoint *gp) override;
+    double giveEffectiveViscosity(GaussPoint *gp, TimeStep *tStep) const override;
+    double give(int aProperty, GaussPoint *gp) const override;
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
     const char *giveClassName() const override { return "TwoFluidMaterial"; }
     const char *giveInputRecordName() const override { return _IFT_TwoFluidMaterial_Name; }
@@ -85,23 +84,22 @@ public:
 
 protected:
     FluidDynamicMaterial *giveMaterial(int i) const;
-    double giveTempVOF(GaussPoint *gp);
+    double giveTempVOF(GaussPoint *gp) const;
 };
 
 
 class TwoFluidMaterialStatus : public FluidDynamicMaterialStatus
 {
 protected:
-    std :: unique_ptr< GaussPoint >slaveGp0;
-    std :: unique_ptr< GaussPoint >slaveGp1;
+    std::array<GaussPoint, 2> slaveGps;
+    ///@todo This should technically suffice;
+    //std::array<std::unique_ptr<MaterialStatus>, 2> slaveStatus;
 
 public:
     /// Constructor
-    TwoFluidMaterialStatus(int n, Domain * d, GaussPoint * g, const IntArray & slaveMaterial);
-    /// Destructor
-    virtual ~TwoFluidMaterialStatus() { }
+    TwoFluidMaterialStatus(GaussPoint * g, const std::array<Material*, 2> &slaveMaterial);
 
-    void printOutputAt(FILE *file, TimeStep *tStep) override;
+    void printOutputAt(FILE *file, TimeStep *tStep) const override;
 
     void initTempStatus() override;
     void updateYourself(TimeStep *tStep) override;
@@ -110,8 +108,8 @@ public:
     void restoreContext(DataStream &stream, ContextMode mode) override;
     const char *giveClassName() const override { return "TwoFluidMaterialStatus"; }
 
-    GaussPoint *giveSlaveGaussPoint0() { return this->slaveGp0.get(); }
-    GaussPoint *giveSlaveGaussPoint1() { return this->slaveGp1.get(); }
+    GaussPoint *giveSlaveGaussPoint0() { return &this->slaveGps[0]; }
+    GaussPoint *giveSlaveGaussPoint1() { return &this->slaveGps[1]; }
 };
 } // end namespace oofem
 #endif // twofluidmaterial_h

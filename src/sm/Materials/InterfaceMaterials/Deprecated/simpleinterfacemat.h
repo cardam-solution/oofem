@@ -55,26 +55,24 @@ namespace oofem {
 class SimpleInterfaceMaterialStatus : public StructuralInterfaceMaterialStatus
 {
 protected:
-    bool shearYieldingFlag;
-    FloatArray shearStressShift, tempShearStressShift;
+    bool shearYieldingFlag = false;
+    FloatArrayF<2> shearStressShift, tempShearStressShift;
 
 public:
     /// Constructor
-    SimpleInterfaceMaterialStatus(int n, Domain * d, GaussPoint * g);
-    /// Destructor
-    virtual ~SimpleInterfaceMaterialStatus();
+    SimpleInterfaceMaterialStatus(GaussPoint * g);
 
-    void printOutputAt(FILE *file, TimeStep *tStep) override;
+    void printOutputAt(FILE *file, TimeStep *tStep) const override;
 
     const char *giveClassName() const override { return "SimpleInterfaceMaterialStatus"; }
 
     void initTempStatus() override;
     void updateYourself(TimeStep *tStep) override;
 
-    const FloatArray &giveShearStressShift();
-    void setTempShearStressShift(FloatArray newShearStressShift) { tempShearStressShift = newShearStressShift; }
-    bool giveShearYieldingFlag(){return shearYieldingFlag;}
-    void setShearYieldingFlag(bool sY){ shearYieldingFlag = sY;}
+    const FloatArrayF<2> &giveShearStressShift() const { return shearStressShift; }
+    void setTempShearStressShift(const FloatArrayF<2> &newShearStressShift) { tempShearStressShift = newShearStressShift; }
+    bool giveShearYieldingFlag() { return shearYieldingFlag; }
+    void setShearYieldingFlag(bool sY) { shearYieldingFlag = sY; }
 
     void saveContext(DataStream &stream, ContextMode mode) override;
     void restoreContext(DataStream &stream, ContextMode mode) override;
@@ -90,32 +88,30 @@ public:
 class SimpleInterfaceMaterial : public StructuralInterfaceMaterial
 {
 protected:
-  double kn, ks;
-    double stiffCoeff;
-    double frictCoeff;
+    double kn = 0., ks = 0.;
+    double stiffCoeff = 0.;
+    double frictCoeff = 0.;
     /// Normal distance which needs to be closed when interface element should act in compression (distance is 0 by default).
-    double normalClearance;
+    double normalClearance = 0.;
 
 public:
     /// Constructor
     SimpleInterfaceMaterial(int n, Domain * d);
-    /// Destructor
-    virtual ~SimpleInterfaceMaterial();
 
     bool hasAnalyticalTangentStiffness() const override { return true; }
 
     const char *giveInputRecordName() const override { return _IFT_SimpleInterfaceMaterial_Name; }
     const char *giveClassName() const override { return "SimpleInterfaceMaterial"; }
 
-    void giveEngTraction_3d(FloatArray &answer, GaussPoint *gp, const FloatArray &jump, TimeStep *tStep) override;
-    void give3dStiffnessMatrix_Eng(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) override;
+    FloatArrayF<3> giveEngTraction_3d(const FloatArrayF<3> &jump, GaussPoint *gp, TimeStep *tStep) const override;
+    FloatMatrixF<3,3> give3dStiffnessMatrix_Eng(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const override;
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
 
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
     void giveInputRecord(DynamicInputRecord &input) override;
 
-    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new SimpleInterfaceMaterialStatus(1, domain, gp); }
+    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new SimpleInterfaceMaterialStatus(gp); }
 };
 } // end namespace oofem
 #endif // simpleinterfacemat_h

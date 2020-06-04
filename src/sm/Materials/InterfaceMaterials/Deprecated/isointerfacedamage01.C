@@ -46,28 +46,20 @@ namespace oofem {
 REGISTER_Material(IsoInterfaceDamageMaterial);
 
 IsoInterfaceDamageMaterial :: IsoInterfaceDamageMaterial(int n, Domain *d) : StructuralInterfaceMaterial(n, d)
-{
-    maxOmega = 0.999999;
-    beta = 0.;
-}
+{}
 
 
-IsoInterfaceDamageMaterial :: ~IsoInterfaceDamageMaterial() { }
-
-
-void
-IsoInterfaceDamageMaterial :: giveEngTraction_3d(FloatArray &answer, GaussPoint *gp, const FloatArray &jump, TimeStep *tStep)
+FloatArrayF<3>
+IsoInterfaceDamageMaterial :: giveEngTraction_3d(const FloatArrayF<3> &jump, GaussPoint *gp, TimeStep *tStep) const
 {
     IsoInterfaceDamageMaterialStatus *status = static_cast< IsoInterfaceDamageMaterialStatus * >( this->giveStatus(gp) );
-    FloatMatrix de;
-    double equivStrain, tempKappa = 0.0, omega = 0.0;
 
     // compute equivalent strain
-    this->computeEquivalentStrain(equivStrain, jump, gp, tStep);
+    double equivStrain = this->computeEquivalentStrain(jump, gp, tStep);
 
     // compute value of loading function if strainLevel crit apply
-    tempKappa = status->giveKappa();
-
+    double tempKappa = status->giveKappa();
+    double omega;
     if ( tempKappa >= equivStrain ) {
         // damage does not grow
         omega = status->giveDamage();
@@ -75,71 +67,59 @@ IsoInterfaceDamageMaterial :: giveEngTraction_3d(FloatArray &answer, GaussPoint 
         // damage grows
         tempKappa = equivStrain;
         // evaluate damage
-        this->computeDamageParam(omega, tempKappa, jump, gp);
+        omega = this->computeDamageParam(tempKappa, jump, gp);
     }
 
-    this->give3dStiffnessMatrix_Eng(de, ElasticStiffness, gp, tStep);
-    de.times(1.0 - omega);
-    answer.beProductOf(de, jump);
+    auto de = this->give3dStiffnessMatrix_Eng(ElasticStiffness, gp, tStep);
+    auto answer = (1.0 - omega) * dot(de, jump);
 
     // update gp
     status->letTempJumpBe(jump);
     status->letTempTractionBe(answer);
     status->setTempKappa(tempKappa);
     status->setTempDamage(omega);
+
+    return answer;
 }
 
 
-void
-IsoInterfaceDamageMaterial :: give3dStiffnessMatrix_Eng(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep)
+FloatMatrixF<3,3>
+IsoInterfaceDamageMaterial :: give3dStiffnessMatrix_Eng(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const
 {
-    double om, un;
     IsoInterfaceDamageMaterialStatus *status = static_cast< IsoInterfaceDamageMaterialStatus * >( this->giveStatus(gp) );
 
-    // assemble eleastic stiffness
-    answer.resize(3, 3);
-    answer.zero();
-    answer.at(1, 1) = kn;
-    answer.at(2, 2) = ks;
-    answer.at(3, 3) = ks;
+    auto answer = diag<3>({kn, ks, ks});
 
     if ( rMode == ElasticStiffness ) {
-        return;
+        return answer;
     }
 
+    double un = status->giveTempJump().at(1);
     if ( rMode == SecantStiffness ) {
-        // Secant stiffness
-        om = status->giveTempDamage();
-        un = status->giveTempJump().at(1);
-        om = min(om, maxOmega);
         // damage in tension only
         if ( un >= 0 ) {
-            answer.times(1.0 - om);
+            double om = min(status->giveTempDamage(), maxOmega);
+            answer *= 1.0 - om;
         }
 
-        return;
-    } else {
-        // Tangent Stiffness
-        FloatArray se;
-        const FloatArray &e = status->giveTempJump();
-        se.beProductOf(answer, e);
-
-        om = status->giveTempDamage();
-        un = status->giveTempJump().at(1);
-        om = min(om, maxOmega);
+        return answer;
+    } else { // Tangent Stiffness
         // damage in tension only
         if ( un >= 0 ) {
-            answer.times(1.0 - om);
-            return;
+            double om = min(status->giveTempDamage(), maxOmega);
+            answer *= 1.0 - om;
 #if 0
             // Unreachable code - commented out to supress compiler warnings
             double dom = -( -e0 / un / un * exp( -( ft / gf ) * ( un - e0 ) ) + e0 / un * exp( -( ft / gf ) * ( un - e0 ) ) * ( -( ft / gf ) ) );
             if ( ( om > 0. ) && ( status->giveTempKappa() > status->giveKappa() ) ) {
+                const auto &e = status->giveTempJump();
+                auto se = dot(answer, e);
                 answer.at(1, 1) -= se.at(1) * dom;
                 answer.at(2, 1) -= se.at(2) * dom;
             }
 #endif
         }
+        return answer;
     }
 }
 
@@ -176,10 +156,10 @@ IsoInterfaceDamageMaterial :: giveIPValue(FloatArray &answer, GaussPoint *gp, In
 }
 
 
-IRResultType
-IsoInterfaceDamageMaterial :: initializeFrom(InputRecord *ir)
+void
+IsoInterfaceDamageMaterial :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;                // Required by IR_GIVE_FIELD macro
+    StructuralInterfaceMaterial :: initializeFrom(ir);
 
     IR_GIVE_FIELD(ir, kn, _IFT_IsoInterfaceDamageMaterial_kn);
     IR_GIVE_FIELD(ir, ks, _IFT_IsoInterfaceDamageMaterial_ks);
@@ -195,8 +175,6 @@ IsoInterfaceDamageMaterial :: initializeFrom(InputRecord *ir)
 
     beta = 0.;
     IR_GIVE_OPTIONAL_FIELD(ir, beta, _IFT_IsoInterfaceDamageMaterial_beta);
-
-    return StructuralInterfaceMaterial :: initializeFrom(ir);
 }
 
 
@@ -215,41 +193,34 @@ IsoInterfaceDamageMaterial :: giveInputRecord(DynamicInputRecord &input)
 }
 
 
-void
-IsoInterfaceDamageMaterial :: computeEquivalentStrain(double &kappa, const FloatArray &jump, GaussPoint *gp, TimeStep *tStep)
+double
+IsoInterfaceDamageMaterial :: computeEquivalentStrain(const FloatArrayF<3> &jump, GaussPoint *gp, TimeStep *tStep) const
 {
     double epsNplus = macbra( jump.at(1) );
     double epsT2 = jump.at(2) * jump.at(2);
     if ( jump.giveSize() == 3 ) {
         epsT2 += jump.at(3) * jump.at(3);
     }
-    kappa = sqrt(epsNplus * epsNplus + beta * epsT2);
+    return sqrt(epsNplus * epsNplus + beta * epsT2);
 }
 
-void
-IsoInterfaceDamageMaterial :: computeDamageParam(double &omega, double kappa, const FloatArray &strain, GaussPoint *gp)
+double
+IsoInterfaceDamageMaterial :: computeDamageParam(double kappa, const FloatArrayF<3> &strain, GaussPoint *gp) const
 {
     if ( kappa > this->e0 ) {
-        omega = 1.0 - ( this->e0 / kappa ) * exp( -( ft / gf ) * ( kappa - e0 ) );
+        return 1.0 - ( this->e0 / kappa ) * exp( -( ft / gf ) * ( kappa - e0 ) );
     } else {
-        omega = 0.0;
+        return 0.0;
     }
 }
 
 
-IsoInterfaceDamageMaterialStatus :: IsoInterfaceDamageMaterialStatus(int n, Domain *d, GaussPoint *g) : StructuralInterfaceMaterialStatus(n, d, g)
-{
-    kappa = tempKappa = 0.0;
-    damage = tempDamage = 0.0;
-}
-
-
-IsoInterfaceDamageMaterialStatus :: ~IsoInterfaceDamageMaterialStatus()
-{ }
+IsoInterfaceDamageMaterialStatus :: IsoInterfaceDamageMaterialStatus(GaussPoint *g) : StructuralInterfaceMaterialStatus(g)
+{}
 
 
 void
-IsoInterfaceDamageMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep)
+IsoInterfaceDamageMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep) const
 {
     StructuralInterfaceMaterialStatus :: printOutputAt(file, tStep);
     fprintf(file, "status { ");

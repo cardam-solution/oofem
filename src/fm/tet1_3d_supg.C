@@ -62,14 +62,9 @@ FEI3dTetLin Tet1_3D_SUPG :: interpolation;
 
 Tet1_3D_SUPG :: Tet1_3D_SUPG(int n, Domain *aDomain) :
     SUPGElement2(n, aDomain)
-    // Constructor.
 {
     numberOfDofMans  = 4;
 }
-
-Tet1_3D_SUPG :: ~Tet1_3D_SUPG()
-// Destructor
-{ }
 
 int
 Tet1_3D_SUPG :: computeNumberOfDofs()
@@ -364,14 +359,14 @@ Tet1_3D_SUPG :: computeCriticalTimeStep(TimeStep *tStep)
         jnode = this->giveNode(j);
         knode = this->giveNode(k);
         lnode = this->giveNode(l);
-        t1.beDifferenceOf(*inode->giveCoordinates(), *jnode->giveCoordinates());
+        t1.beDifferenceOf(inode->giveCoordinates(), jnode->giveCoordinates());
 
-        t2.beDifferenceOf(*knode->giveCoordinates(), *jnode->giveCoordinates());
+        t2.beDifferenceOf(knode->giveCoordinates(), jnode->giveCoordinates());
 
         n.beVectorProductOf(t1, t2);
         n.normalize();
 
-        n3.beDifferenceOf(*lnode->giveCoordinates(), *jnode->giveCoordinates());
+        n3.beDifferenceOf(lnode->giveCoordinates(), jnode->giveCoordinates());
 
         ln = min( ln, sqrt( fabs( n.dotProduct(n3) ) ) );
     }
@@ -402,14 +397,14 @@ Tet1_3D_SUPG :: computeVolumeAround(GaussPoint *gp)
 void
 Tet1_3D_SUPG :: computeDeviatoricStress(FloatArray &answer, const FloatArray &eps, GaussPoint *gp, TimeStep *tStep)
 {
-    static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeDeviatoricStress3D(answer, gp, eps, tStep);
+    answer = static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeDeviatoricStress3D(eps, gp, tStep);
 }
 
 
 void
 Tet1_3D_SUPG :: computeTangent(FloatMatrix &answer, MatResponseMode mode, GaussPoint *gp, TimeStep *tStep)
 {
-    static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeTangent3D(answer, mode, gp, tStep);
+    answer = static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeTangent3D(mode, gp, tStep);
 }
 
 

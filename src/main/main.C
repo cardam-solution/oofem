@@ -35,7 +35,7 @@
 //  MAIN
 //  Solves finite element problems.
 //
-#ifdef __PYTHON_MODULE
+#ifdef _PYTHON_EXTENSION
  #include <Python.h>
 #endif
 
@@ -102,7 +102,9 @@ void exception_handler() {
         }
     } catch(const std::exception& e) {
         fprintf(stderr, "Caught exception: %s\n", e.what());
+#ifdef __GNUC__
         print_stacktrace();
+#endif
         exit(1);
     }
 }
@@ -247,7 +249,7 @@ int main(int argc, char *argv[])
     SlepcInitialize(& modulesArgc, & modulesArgv, PETSC_NULL, PETSC_NULL);
 #endif
 
-#ifdef __PYTHON_MODULE
+#ifdef _PYTHON_EXTENSION
     Py_Initialize();
     // Adding . to the system path allows us to run Python functions stored in the working directory.
     PyRun_SimpleString("import sys");
@@ -381,7 +383,7 @@ void oofem_finalize_modules()
     MPI_Finalize();
 #endif
 
-#ifdef __PYTHON_MODULE
+#ifdef _PYTHON_EXTENSION
     Py_Finalize();
 #endif
 }

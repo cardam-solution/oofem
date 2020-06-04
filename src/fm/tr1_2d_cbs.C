@@ -76,12 +76,9 @@ TR1_2D_CBS :: TR1_2D_CBS(int n, Domain *aDomain) :
     , LEPlicElementInterface()
     //</RESTRICTED_SECTION>
 {
-    // Constructor.
     numberOfDofMans  = 3;
 }
 
-TR1_2D_CBS :: ~TR1_2D_CBS()
-{ }
 
 FEInterpolation *
 TR1_2D_CBS :: giveInterpolation() const { return & interp; }
@@ -99,12 +96,12 @@ TR1_2D_CBS :: giveDofManDofIDMask(int inode, IntArray &answer) const
 }
 
 
-IRResultType
-TR1_2D_CBS :: initializeFrom(InputRecord *ir)
+void
+TR1_2D_CBS :: initializeFrom(InputRecord &ir)
 {
-    //<RESTRICTED_SECTION>
-    IRResultType result;                // Required by IR_GIVE_FIELD macro
+    CBSElement :: initializeFrom(ir);
 
+    //<RESTRICTED_SECTION>
     this->vof = 0.0;
     IR_GIVE_OPTIONAL_FIELD(ir, vof, _IFT_Tr1CBS_pvof);
     if ( vof > 0.0 ) {
@@ -117,8 +114,6 @@ TR1_2D_CBS :: initializeFrom(InputRecord *ir)
     }
 
     //</RESTRICTED_SECTION>
-
-    return CBSElement :: initializeFrom(ir);
 }
 
 
@@ -654,7 +649,7 @@ TR1_2D_CBS :: giveInterface(InterfaceType interface)
     }
 
     //</RESTRICTED_SECTION>
-    return NULL;
+    return nullptr;
 }
 
 
@@ -662,25 +657,25 @@ void
 TR1_2D_CBS :: computeDeviatoricStress(FloatArray &answer, GaussPoint *gp, TimeStep *tStep)
 {
     /* one should call material driver instead */
-    FloatArray u, eps(3);
-
+    FloatArray u;
     this->computeVectorOfVelocities(VM_Total, tStep, u);
 
-    eps.at(1) = ( b [ 0 ] * u.at(1) + b [ 1 ] * u.at(3) + b [ 2 ] * u.at(5) );
-    eps.at(2) = ( c [ 0 ] * u.at(2) + c [ 1 ] * u.at(4) + c [ 2 ] * u.at(6) );
-    eps.at(3) = ( b [ 0 ] * u.at(2) + b [ 1 ] * u.at(4) + b [ 2 ] * u.at(6) + c [ 0 ] * u.at(1) + c [ 1 ] * u.at(3) + c [ 2 ] * u.at(5) );
-    static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeDeviatoricStress2D(answer, gp, eps, tStep);
+    FloatArrayF<3> eps = {
+        b [ 0 ] * u.at(1) + b [ 1 ] * u.at(3) + b [ 2 ] * u.at(5),
+        c [ 0 ] * u.at(2) + c [ 1 ] * u.at(4) + c [ 2 ] * u.at(6),
+        b [ 0 ] * u.at(2) + b [ 1 ] * u.at(4) + b [ 2 ] * u.at(6) + c [ 0 ] * u.at(1) + c [ 1 ] * u.at(3) + c [ 2 ] * u.at(5),
+    };
+    answer = static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeDeviatoricStress2D(eps, gp, tStep);
 }
 
 int
 TR1_2D_CBS :: checkConsistency()
 {
-    Node *node1, *node2, *node3;
     double x1, x2, x3, y1, y2, y3;
 
-    node1 = giveNode(1);
-    node2 = giveNode(2);
-    node3 = giveNode(3);
+    auto node1 = giveNode(1);
+    auto node2 = giveNode(2);
+    auto node3 = giveNode(3);
 
     // init geometry data
     x1 = node1->giveCoordinate(1);

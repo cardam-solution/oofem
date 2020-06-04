@@ -46,10 +46,10 @@ class FEI2dLineLin;
  * with interior penalty formulation.
  * @author Erik Svenning
  */
-class IntElLine1IntPen : public IntElLine1 {
+class IntElLine1IntPen : public IntElLine1
+{
 public:
-	IntElLine1IntPen(int n, Domain * d);
-	virtual ~IntElLine1IntPen();
+    IntElLine1IntPen(int n, Domain * d);
 
     const char *giveInputRecordName() const override { return _IFT_IntElLine1IntPen_Name; }
     const char *giveClassName() const override { return "IntElLine1IntPen"; }
@@ -57,7 +57,7 @@ public:
     int computeGlobalCoordinates(FloatArray &answer, const FloatArray &lcoords) override;
 
 
-    void computeCovarBaseVectorAt(GaussPoint *gp, FloatArray &G) override;
+    FloatArrayF<2> computeCovarBaseVectorAt(GaussPoint *gp) const override;
 
     /**
      * Computes the stiffness/tangent matrix of receiver. Default implementation computes element stiffness using

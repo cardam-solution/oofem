@@ -36,6 +36,7 @@
 #define intelline1_h
 
 #include "sm/Elements/Interfaces/structuralinterfaceelement.h"
+#include "floatmatrixf.h"
 
 #define _IFT_IntElLine1_Name "intelline1"
 #define _IFT_IntElLine1_axisymmode "axisymmode"
@@ -57,11 +58,10 @@ class IntElLine1 : public StructuralInterfaceElement
 protected:
     static FEI2dLineLin interp;
     /// Flag controlling axisymmetric mode (integration over unit circumferential angle)
-    bool axisymmode;
+    bool axisymmode = false;
 
 public:
     IntElLine1(int n, Domain * d);
-    virtual ~IntElLine1() { }
 
     FEInterpolation *giveInterpolation() const override;
 
@@ -70,7 +70,7 @@ public:
 
     double computeAreaAround(GaussPoint *gp) override;
     void computeTransformationMatrixAt(GaussPoint *gp, FloatMatrix &answer) override;
-    virtual void computeCovarBaseVectorAt(GaussPoint *gp, FloatArray &G);
+    virtual FloatArrayF<2> computeCovarBaseVectorAt(GaussPoint *gp) const;
 
     int testElementExtension(ElementExtension ext) override { return 0; }
 
@@ -79,16 +79,16 @@ public:
     // definition & identification
     const char *giveInputRecordName() const override { return _IFT_IntElLine1_Name; }
     const char *giveClassName() const override { return "IntElLine1"; }
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
 
     void giveEngTraction(FloatArray &answer, GaussPoint *gp, const FloatArray &jump, TimeStep *tStep) override
     {
-        this->giveInterfaceCrossSection()->giveEngTraction_2d(answer, gp, jump, tStep);
+        answer = this->giveInterfaceCrossSection()->giveEngTraction_2d(jump, gp, tStep);
     }
 
     void giveStiffnessMatrix_Eng(FloatMatrix &answer, MatResponseMode rMode, IntegrationPoint *ip, TimeStep *tStep) override
     {
-        this->giveInterfaceCrossSection()->give2dStiffnessMatrix_Eng(answer, rMode, ip, tStep);
+        answer = this->giveInterfaceCrossSection()->give2dStiffnessMatrix_Eng(rMode, ip, tStep);
     }
 
 #ifdef __OOFEG

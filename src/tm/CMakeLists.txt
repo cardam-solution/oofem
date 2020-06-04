@@ -14,6 +14,7 @@ set (tm_emodel
 set (tm_element
     Elements/transportelement.C
     Elements/quad1_ht.C
+    Elements/qquad1_ht.C
     Elements/tr1_ht.C
     Elements/quadaxisym1_ht.C
     Elements/traxisym1_ht.C
@@ -23,8 +24,9 @@ set (tm_element
     Elements/qwedge_ht.C
     Elements/tetrah1_ht.C
     Elements/tr1darcy.C
-    Elements/latticetransportelement.C
-    Elements/lattice2d_mt.C
+    Elements/LatticeElements/latticetransportelement.C
+    Elements/LatticeElements/lattice2d_mt.C
+    Elements/LatticeElements/lattice3d_mt.C
     )
 
 set (tm_boundary
@@ -51,11 +53,12 @@ set (tm_material
     Materials/isoheatmat.C
     Materials/isolinmoisturemat.C
     Materials/isomoisturemat.C
-    Materials/latticetransmat.C
+    Materials/LatticeMaterials/latticetransmat.C
     Materials/nlisomoisturemat.C
     Materials/nonlinearmassmat.C
     Materials/rvestokesflow.C
     Materials/transportmaterial.C
+    Materials/twophasemat.C
     )
 
 set (tm

@@ -60,31 +60,29 @@ class IntMatIsoDamageStatus : public StructuralInterfaceMaterialStatus
 {
 protected:
     /// Scalar measure of the largest equivalent displacement ever reached in material.
-    double kappa;
+    double kappa = 0.;
     /// Non-equilibrated scalar measure of the largest equivalent displacement.
-    double tempKappa;
+    double tempKappa = 0.;
     /// Damage level of material.
-    double damage;
+    double damage = 0.;
     /// Non-equilibrated damage level of material.
-    double tempDamage;
+    double tempDamage = 0.;
 public:
     /// Constructor
-    IntMatIsoDamageStatus(int n, Domain *d, GaussPoint *g);
-    /// Destructor
-    virtual ~IntMatIsoDamageStatus();
+    IntMatIsoDamageStatus(GaussPoint *g);
 
-    void printOutputAt(FILE *file, TimeStep *tStep) override;
+    void printOutputAt(FILE *file, TimeStep *tStep) const override;
 
     /// Returns the last equilibrated scalar measure of the largest jump level.
-    double giveKappa() { return kappa; }
+    double giveKappa() const { return kappa; }
     /// Returns the temp. scalar measure of the largest jump level.
-    double giveTempKappa() { return tempKappa; }
+    double giveTempKappa() const { return tempKappa; }
     /// Sets the temp scalar measure of the largest strain level to given value.
     void setTempKappa(double newKappa) { tempKappa = newKappa; }
     /// Returns the last equilibrated damage level.
-    double giveDamage() override { return damage; }
+    double giveDamage() const override { return damage; }
     /// Returns the temp. damage level.
-    double giveTempDamage() override { return tempDamage; }
+    double giveTempDamage() const override { return tempDamage; }
     /// Sets the temp damage level to given value.
     void setTempDamage(double newDamage) { tempDamage = newDamage; }
 
@@ -113,64 +111,59 @@ class IntMatIsoDamage : public StructuralInterfaceMaterial
 {
 protected:
     /// Elastic properties (normal moduli).
-    double kn;
+    double kn = 0.;
     /// Shear moduli.
-    double ks;
+    double ks = 0.;
     /// Tension strength.
-    double ft;
+    double ft = 0.;
     /// Fracture energy.
-    double gf;
+    double gf = 0.;
     /// Limit elastic deformation.
-    double e0;
+    double e0 = 0.;
     /// Maximum limit on omega. The purpose is elimination of a too compliant material which may cause convergency problems. Set to something like 0.99 if needed.
-    double maxOmega;
+    double maxOmega = 0.999999;
 
-    bool semiExplicit; // If semi-explicit time integration should be used
+    bool semiExplicit = false; // If semi-explicit time integration should be used
 
 public:
     IntMatIsoDamage(int n, Domain *d);
-    virtual ~IntMatIsoDamage();
 
     const char *giveInputRecordName() const override { return _IFT_IntMatIsoDamage_Name; }
     const char *giveClassName() const override { return "IntMatIsoDamage"; }
 
     bool hasAnalyticalTangentStiffness() const override { return true; } 
 
-    void giveEngTraction_3d(FloatArray &answer, GaussPoint *gp,
-                            const FloatArray &jump, TimeStep *tStep) override;
+    FloatArrayF<3> giveEngTraction_3d(const FloatArrayF<3> &jump, GaussPoint *gp,TimeStep *tStep) const override;
 
-    void giveFirstPKTraction_3d(FloatArray &answer, GaussPoint *gp, const FloatArray &jump,
-                                const FloatMatrix &F, TimeStep *tStep) override;
+    FloatArrayF<3> giveFirstPKTraction_3d(const FloatArrayF<3> &jump, const FloatMatrixF<3,3> &F, GaussPoint *gp, TimeStep *tStep) const override;
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
 
     /**
      * Computes the equivalent jump measure from given jump vector (full form).
-     * @param[out] kappa Return parameter containing the corresponding equivalent jump.
      * @param jump Jump vector in full form.
      * @param gp Integration point.
      * @param tStep Time step.
+     * @return Return parameter containing the corresponding equivalent jump (kappa)
      */
-    virtual void computeEquivalentJump(double &kappa, const FloatArray &jump);
+    virtual double computeEquivalentJump(const FloatArray &jump) const;
 
     /**
      * computes the value of damage parameter omega, based on given value of equivalent strain.
-     * @param[out] omega Contains result.
      * @param kappa Equivalent strain measure.
      * @param strain Total strain vector in full form. (unnecessary?)
      * @param gp Integration point.
+     * @return omega.
      */
-    virtual void computeDamageParam(double &omega, double kappa);
+    virtual double computeDamageParam(double kappa) const;
 
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
     void giveInputRecord(DynamicInputRecord &input) override;
 
-    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new IntMatIsoDamageStatus(1, domain, gp); }
+    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new IntMatIsoDamageStatus(gp); }
 
-    void give2dStiffnessMatrix_Eng(FloatMatrix &answer, MatResponseMode rMode,
-                                   GaussPoint *gp, TimeStep *tStep) override;
-    void give3dStiffnessMatrix_Eng(FloatMatrix &answer, MatResponseMode rMode,
-                                   GaussPoint *gp, TimeStep *tStep) override;
+    FloatMatrixF<2,2> give2dStiffnessMatrix_Eng(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const override;
+    FloatMatrixF<3,3> give3dStiffnessMatrix_Eng(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const override;
 };
 } // end namespace oofem
 #endif // isointerfacedamage01_h

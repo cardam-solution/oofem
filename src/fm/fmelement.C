@@ -40,10 +40,6 @@ FMElement :: FMElement(int n, Domain *aDomain) :
 { }
 
 
-FMElement :: ~FMElement()
-{ }
-
-
 void
 FMElement :: computeVectorOfVelocities(ValueModeType mode, TimeStep *tStep, FloatArray &velocities)
 {
@@ -56,5 +52,24 @@ FMElement :: computeVectorOfPressures(ValueModeType mode, TimeStep *tStep, Float
 {
     this->computeVectorOf({P_f}, mode, tStep, pressures);
 }
+
+
+FloatArray
+FMElement :: computeVectorOfVelocities(ValueModeType mode, TimeStep *tStep)
+{
+    FloatArray ans;
+    this->computeVectorOf({V_u, V_v, V_w}, mode, tStep, ans);
+    return ans;
+}
+
+
+FloatArray
+FMElement :: computeVectorOfPressures(ValueModeType mode, TimeStep *tStep)
+{
+    FloatArray ans;
+    this->computeVectorOf({P_f}, mode, tStep, ans);
+    return ans;
+}
+
 
 } // end namespace oofem

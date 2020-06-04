@@ -70,9 +70,6 @@ Quad10_2D_SUPG :: Quad10_2D_SUPG(int n, Domain *aDomain) :
     numberOfDofMans = 4;
 }
 
-Quad10_2D_SUPG :: ~Quad10_2D_SUPG()
-{ }
-
 FEInterpolation *
 Quad10_2D_SUPG :: giveInterpolation() const
 {
@@ -117,12 +114,12 @@ Quad10_2D_SUPG :: giveInternalDofManDofIDMask(int i, IntArray &answer) const
 }
 
 
-IRResultType
-Quad10_2D_SUPG :: initializeFrom(InputRecord *ir)
+void
+Quad10_2D_SUPG :: initializeFrom(InputRecord &ir)
 {
     this->pressureNode.initializeFrom(ir);
 
-    return SUPGElement2 :: initializeFrom(ir);
+    SUPGElement2 :: initializeFrom(ir);
 }
 
 
@@ -158,17 +155,15 @@ Quad10_2D_SUPG :: computeGaussPoints()
 void
 Quad10_2D_SUPG :: computeDeviatoricStress(FloatArray &answer, const FloatArray &eps, GaussPoint *gp, TimeStep *tStep)
 {
-    static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeDeviatoricStress2D(answer, gp, eps, tStep);
+    answer = static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeDeviatoricStress2D(eps, gp, tStep);
 }
 
 
 void
 Quad10_2D_SUPG :: computeTangent(FloatMatrix &answer, MatResponseMode mode, GaussPoint *gp, TimeStep *tStep)
 {
-    static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeTangent2D(answer, mode, gp, tStep);
+    answer = static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeTangent2D(mode, gp, tStep);
 }
-
-
 
 
 void
@@ -177,7 +172,7 @@ Quad10_2D_SUPG :: computeNuMatrix(FloatMatrix &answer, GaussPoint *gp)
     FloatArray n;
     this->velocityInterpolation.evalN( n, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this) );
     answer.beNMatrixOf(n, 2);
- }
+}
 
 
 void

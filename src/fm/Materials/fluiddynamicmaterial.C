@@ -39,106 +39,88 @@
 
 namespace oofem {
 
-void
-FluidDynamicMaterial :: computeDeviatoricStress3D(FloatArray &stress_dev, double &epsp_vol, GaussPoint *gp, const FloatArray &eps, double pressure, TimeStep *tStep)
+std::pair<FloatArrayF<6>, double>
+FluidDynamicMaterial :: computeDeviatoricStress3D(const FloatArrayF<6> &eps, double pressure, GaussPoint *gp, TimeStep *tStep) const
 {
-    epsp_vol = -( eps[0] + eps[1] + eps[2] );
-    this->computeDeviatoricStress3D(stress_dev, gp, eps, tStep);
+    double epsp_vol = -( eps[0] + eps[1] + eps[2] );
+    auto stress_dev = this->computeDeviatoricStress3D(eps, gp, tStep);
+    return {stress_dev, epsp_vol};
 }
 
 
-void
-FluidDynamicMaterial :: computeDeviatoricStress2D(FloatArray &stress_dev, double &epsp_vol, GaussPoint *gp, const FloatArray &eps, double pressure, TimeStep *tStep)
+std::pair<FloatArrayF<3>, double>
+FluidDynamicMaterial :: computeDeviatoricStress2D(const FloatArrayF<3> &eps, double pressure, GaussPoint *gp, TimeStep *tStep) const
 {
-    FloatArray stress3, eps3 = {eps[0], eps[1], 0., 0., 0., eps[2]};
-    this->computeDeviatoricStress3D(stress3, epsp_vol, gp, eps3, pressure, tStep);
-    stress_dev = {stress3[0], stress3[1], stress3[5]};
+    //auto [stress, epsv] = this->computeDeviatoricStress3D(assemble<6>(eps, {0, 1, 5}), pressure, gp, tStep);
+    auto val = this->computeDeviatoricStress3D(assemble<6>(eps, {0, 1, 5}), pressure, gp, tStep);
+    auto stress3 = val.first;
+    auto epsv = val.second;
+    return {stress3[{0, 1, 5}], epsv};
 }
 
 
-void
-FluidDynamicMaterial :: computeDeviatoricStress2D(FloatArray &answer, GaussPoint *gp, const FloatArray &eps, TimeStep *tStep)
+FloatArrayF<3>
+FluidDynamicMaterial :: computeDeviatoricStress2D(const FloatArrayF<3> &eps, GaussPoint *gp, TimeStep *tStep) const
 {
-    FloatArray stress3, eps3 = {eps[0], eps[1], 0., 0., 0., eps[2]};
-    this->computeDeviatoricStress3D(stress3, gp, eps3, tStep);
-    answer = {stress3[0], stress3[1], stress3[5]};
+    auto stress3 = this->computeDeviatoricStress3D(assemble<6>(eps, {0, 1, 5}), gp, tStep);
+    return stress3[{0, 1, 5}];
 }
 
 
-void
-FluidDynamicMaterial :: computeDeviatoricStressAxi(FloatArray &answer, GaussPoint *gp, const FloatArray &eps, TimeStep *tStep)
+FloatArrayF<4>
+FluidDynamicMaterial :: computeDeviatoricStressAxi(const FloatArrayF<4> &eps, GaussPoint *gp, TimeStep *tStep) const
 {
-    FloatArray stress3, eps3 = {eps[0], eps[1], eps[2], 0., 0., eps[3]};
-    this->computeDeviatoricStress3D(stress3, gp, eps3, tStep);
-    answer = {stress3[0], stress3[1], stress3[2], stress3[5]};
+    auto stress3 = this->computeDeviatoricStress3D(assemble<6>(eps, {0, 1, 2, 5}), gp, tStep);
+    return stress3[{0, 1, 2, 5}];
 }
 
 
-void
-FluidDynamicMaterial :: computeTangent2D(FloatMatrix &answer, MatResponseMode mode, GaussPoint *gp, TimeStep *tStep)
+FloatMatrixF<3,3>
+FluidDynamicMaterial :: computeTangent2D(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const
 {
-    FloatMatrix dsdd3;
-    this->computeTangent3D(dsdd3, mode, gp, tStep);
-    answer = {
-        {dsdd3(0, 0), dsdd3(0, 1), dsdd3(0, 5)},
-        {dsdd3(1, 0), dsdd3(1, 1), dsdd3(0, 5)},
-        {dsdd3(5, 0), dsdd3(5, 1), dsdd3(5, 5)}
+    auto dsdd3 = this->computeTangent3D(mode, gp, tStep);
+    return dsdd3({0, 1, 5}, {0, 1, 5});
+}
+
+
+FloatMatrixF<4,4>
+FluidDynamicMaterial :: computeTangentAxi(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const
+{
+    auto dsdd3 = this->computeTangent3D(mode, gp, tStep);
+    return dsdd3({0, 1, 2, 5}, {0, 1, 2, 5});
+}
+
+
+FluidDynamicMaterial::Tangents<6>
+FluidDynamicMaterial :: computeTangents3D(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const
+{
+    return {
+        this->computeTangent3D(mode, gp, tStep),
+        zeros<6>(),
+        zeros<6>(),
+        0.
     };
 }
 
 
-void
-FluidDynamicMaterial :: computeTangentAxi(FloatMatrix &answer, MatResponseMode mode, GaussPoint *gp, TimeStep *tStep)
+FluidDynamicMaterial::Tangents<3>
+FluidDynamicMaterial :: computeTangents2D(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const
 {
-    FloatMatrix dsdd3;
-    this->computeTangent3D(dsdd3, mode, gp, tStep);
-    answer = {
-        {dsdd3(0, 0), dsdd3(0, 1), dsdd3(0, 2), dsdd3(0, 5)},
-        {dsdd3(1, 0), dsdd3(1, 1), dsdd3(1, 2), dsdd3(1, 5)},
-        {dsdd3(2, 0), dsdd3(2, 1), dsdd3(2, 2), dsdd3(2, 5)},
-        {dsdd3(5, 0), dsdd3(5, 1), dsdd3(5, 2), dsdd3(5, 5)}
-    };
+    auto t = this->computeTangents3D(mode, gp, tStep);
+
+    auto dsdd = t.dsdd({0, 1, 5}, {0, 1, 5});
+    auto dsdp = t.dsdp[{0, 1, 5}];
+    auto dedd = t.dedd[{0, 1, 5}];
+    return {dsdd, dsdp, dedd, t.dedp};
 }
 
 
-void
-FluidDynamicMaterial :: computeTangents3D(FloatMatrix &dsdd, FloatArray &dsdp, FloatArray &dedd, double &dedp,
-                                          MatResponseMode mode, GaussPoint *gp, TimeStep *tStep)
-{
-    this->computeTangent3D(dsdd, mode, gp, tStep);
-    int size = dsdd.giveNumberOfRows();
-    dsdp.resize(size);
-    dsdp.zero();
-    dedd.resize(size);
-    dedd.zero();
-    dedp = 0;
-}
-
-
-void
-FluidDynamicMaterial :: computeTangents2D(FloatMatrix &dsdd, FloatArray &dsdp, FloatArray &dedd, double &dedp,
-                                          MatResponseMode mode, GaussPoint *gp, TimeStep *tStep)
-{
-    FloatMatrix dsdd3;
-    FloatArray dsdp3, dedd3;
-    this->computeTangents3D(dsdd3, dsdp3, dedd3, dedp, mode, gp, tStep);
-
-    dsdd = {
-        {dsdd3(0, 0), dsdd3(0, 1), dsdd3(0, 5)},
-        {dsdd3(1, 0), dsdd3(1, 1), dsdd3(1, 5)},
-        {dsdd3(5, 0), dsdd3(5, 1), dsdd3(5, 5)}
-    };
-    dsdp = {dsdp3[0], dsdp3[1], dsdp3[5]};
-    dedd = {dedd3[0], dedd3[1], dedd3[5]};
-}
-
-
-FluidDynamicMaterialStatus :: FluidDynamicMaterialStatus(int n, Domain *d, GaussPoint *g) :
-    MaterialStatus(n, d, g), deviatoricStressVector(6), deviatoricStrainRateVector(6)
+FluidDynamicMaterialStatus :: FluidDynamicMaterialStatus(GaussPoint *g) :
+    MaterialStatus(g)
 { }
 
 void
-FluidDynamicMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep)
+FluidDynamicMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep) const
 {
     fprintf(file, "\n deviatoric stresses");
     for ( double e: deviatoricStressVector ) {
@@ -151,7 +133,7 @@ FluidDynamicMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep)
 int
 FluidDynamicMaterial :: giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep)
 {
-    FluidDynamicMaterialStatus *status = static_cast< FluidDynamicMaterialStatus * >( this->giveStatus(gp) );
+    auto status = static_cast< FluidDynamicMaterialStatus * >( this->giveStatus(gp) );
     if ( type == IST_DeviatoricStress ) {
         answer = status->giveDeviatoricStressVector();
         return 1;

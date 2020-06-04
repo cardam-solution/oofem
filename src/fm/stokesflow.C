@@ -55,13 +55,13 @@ StokesFlow :: StokesFlow(int i, EngngModel *_master) : FluidModel(i, _master)
     this->ndomains = 1;
 }
 
-StokesFlow :: ~StokesFlow()
-{
-}
 
-IRResultType StokesFlow :: initializeFrom(InputRecord *ir)
+StokesFlow :: ~StokesFlow() { }
+
+
+void StokesFlow :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;
+    FluidModel :: initializeFrom(ir);
     int val;
 
     val = ( int ) SMT_PetscMtrx;
@@ -82,8 +82,6 @@ IRResultType StokesFlow :: initializeFrom(InputRecord *ir)
     this->ts = TS_OK;
 
     this->maxdef = 25; ///@todo Deal with this parameter (set to some reasonable value by default now)
-
-    return FluidModel :: initializeFrom(ir);
 }
 
 
@@ -148,7 +146,6 @@ void StokesFlow :: solveYourselfAt(TimeStep *tStep)
     double loadLevel;
     int currentIterations;
     this->updateInternalRHS( this->internalForces, tStep, d, &this->eNorm );
-    internalForces.printYourself("int0");
     NM_Status status = this->nMethod->solve(*this->stiffnessMatrix,
                                             externalForces,
                                             NULL,
@@ -178,7 +175,6 @@ void StokesFlow :: solveYourselfAt(TimeStep *tStep)
 void StokesFlow :: updateComponent(TimeStep *tStep, NumericalCmpn cmpn, Domain *d)
 {
     velocityPressureField->update(VM_Total, tStep, solutionVector, EModelDefaultEquationNumbering());
-    solutionVector.printYourself("sol*");
 
     // update element stabilization
     for ( auto &elem : d->giveElements() ) {

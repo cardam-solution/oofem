@@ -48,18 +48,13 @@ REGISTER_Material(SimpleInterfaceMaterial);
 SimpleInterfaceMaterial :: SimpleInterfaceMaterial(int n, Domain *d) : StructuralInterfaceMaterial(n, d) { }
 
 
-SimpleInterfaceMaterial :: ~SimpleInterfaceMaterial() { }
-
-
-void
-SimpleInterfaceMaterial :: giveEngTraction_3d(FloatArray &answer, GaussPoint *gp, const FloatArray &jump, TimeStep *tStep)
+FloatArrayF<3>
+SimpleInterfaceMaterial :: giveEngTraction_3d(const FloatArrayF<3> &jump, GaussPoint *gp, TimeStep *tStep) const
 {
     SimpleInterfaceMaterialStatus *status = static_cast< SimpleInterfaceMaterialStatus * >( this->giveStatus(gp) );
     bool shearYieldingFlag = false;
-    FloatArray shearJump(2), shearTraction;
-    FloatArray tempShearStressShift = status->giveShearStressShift();
     double normalStrain = jump.at(1);
-    double normalStress, maxShearStress, dp;
+    double normalStress, maxShearStress;
     double shift = -this->kn * this->stiffCoeff * normalClearance;
 
     if ( normalStrain + normalClearance <= 0. ) {
@@ -70,48 +65,43 @@ SimpleInterfaceMaterial :: giveEngTraction_3d(FloatArray &answer, GaussPoint *gp
         maxShearStress = 0.;
     }
 
-
-    shearJump.at(1) = jump.at(2);
-    shearJump.at(2) = jump.at(3);
-    shearTraction.beScaled(this->ks, shearJump);
-    shearTraction.subtract(tempShearStressShift);
-    dp = shearTraction.dotProduct(shearTraction, 2);
-    if ( dp > maxShearStress * maxShearStress ) {
+    FloatArrayF<2> tempShearStressShift = status->giveShearStressShift();
+    FloatArrayF<2> shearJump = {jump.at(2), jump.at(3)};
+    auto shearTraction = this->ks * shearJump - tempShearStressShift;
+    double dpn = norm(shearTraction);
+    if ( dpn > maxShearStress ) {
         shearYieldingFlag = true;
-        shearTraction.times( maxShearStress / sqrt(dp) );
+        shearTraction *= maxShearStress / dpn;
     }
 
-    tempShearStressShift.beScaled(this->ks, shearJump);
-    tempShearStressShift.subtract(shearTraction);
+    tempShearStressShift = this->ks * shearJump - shearTraction;
 
     double lim = 1.e+50;
-    answer.resize(3);
-    answer.at(1) = max(min(normalStress, lim), -lim);  //threshold on maximum/minimum
-    answer.at(2) = shearTraction.at(1);
-    answer.at(3) = shearTraction.at(2);
+    FloatArrayF<3> answer = {max(min(normalStress, lim), -lim), shearTraction.at(1), shearTraction.at(2)};
 
     // update gp
     status->setShearYieldingFlag(shearYieldingFlag);
     status->setTempShearStressShift(tempShearStressShift);
     status->letTempJumpBe(jump);
     status->letTempTractionBe(answer);
+    return answer;
 }
 
 
-void
-SimpleInterfaceMaterial :: give3dStiffnessMatrix_Eng(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep)
+FloatMatrixF<3,3>
+SimpleInterfaceMaterial :: give3dStiffnessMatrix_Eng(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const
 {
     SimpleInterfaceMaterialStatus *status = static_cast< SimpleInterfaceMaterialStatus * >( this->giveStatus(gp) );
     double normalJump = status->giveTempJump().at(1);
 
-    answer.resize(3, 3);
+    FloatMatrixF<3,3> answer;
     if ( rMode == SecantStiffness || rMode == TangentStiffness ) {
         if ( normalJump + normalClearance <= 0. ) {
-	      answer.at(1, 1) = kn;
-	      if ( status->giveShearYieldingFlag() )
-		answer.at(2, 2) = answer.at(3, 3) = 0;
-	      else
-		answer.at(2, 2) = answer.at(3, 3) = ks;//this->kn; //in compression and after the clearance gap closed
+            answer.at(1, 1) = kn;
+            if ( status->giveShearYieldingFlag() )
+                answer.at(2, 2) = answer.at(3, 3) = 0;
+            else
+                answer.at(2, 2) = answer.at(3, 3) = ks;//this->kn; //in compression and after the clearance gap closed
         } else {
             answer.at(1, 1) = this->kn * this->stiffCoeff;
             answer.at(2, 2) = answer.at(3, 3) = 0;
@@ -120,6 +110,7 @@ SimpleInterfaceMaterial :: give3dStiffnessMatrix_Eng(FloatMatrix &answer, MatRes
         answer.at(1, 1) = kn;
         answer.at(2, 2) = answer.at(3, 3) = this->ks;
     }
+    return answer;
 }
 
 
@@ -130,10 +121,10 @@ SimpleInterfaceMaterial :: giveIPValue(FloatArray &answer, GaussPoint *gp, Inter
 }
 
 
-IRResultType
-SimpleInterfaceMaterial :: initializeFrom(InputRecord *ir)
+void
+SimpleInterfaceMaterial :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;                // Required by IR_GIVE_FIELD macro
+    StructuralInterfaceMaterial :: initializeFrom(ir);
 
     frictCoeff = 0.;
     stiffCoeff = 0.;
@@ -144,8 +135,6 @@ SimpleInterfaceMaterial :: initializeFrom(InputRecord *ir)
     IR_GIVE_OPTIONAL_FIELD(ir, frictCoeff, _IFT_SimpleInterfaceMaterial_frictCoeff);
     IR_GIVE_OPTIONAL_FIELD(ir, stiffCoeff, _IFT_SimpleInterfaceMaterial_stiffCoeff);
     IR_GIVE_OPTIONAL_FIELD(ir, normalClearance, _IFT_SimpleInterfaceMaterial_normalClearance);
-
-    return StructuralInterfaceMaterial :: initializeFrom(ir);
 }
 
 
@@ -160,22 +149,12 @@ SimpleInterfaceMaterial :: giveInputRecord(DynamicInputRecord &input)
 }
 
 
-SimpleInterfaceMaterialStatus :: SimpleInterfaceMaterialStatus(int n, Domain *d, GaussPoint *g) : StructuralInterfaceMaterialStatus(n, d, g)
-{
-    shearStressShift.resize(2);
-    tempShearStressShift.resize(2);
-    shearStressShift.zero();
-    tempShearStressShift.zero();
-    shearYieldingFlag = false;
-}
-
-
-SimpleInterfaceMaterialStatus :: ~SimpleInterfaceMaterialStatus()
-{ }
+SimpleInterfaceMaterialStatus :: SimpleInterfaceMaterialStatus(GaussPoint *g) : StructuralInterfaceMaterialStatus(g)
+{}
 
 
 void
-SimpleInterfaceMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep)
+SimpleInterfaceMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep) const
 {
     StructuralInterfaceMaterialStatus :: printOutputAt(file, tStep);
     fprintf(file, "status { ");
@@ -197,13 +176,6 @@ SimpleInterfaceMaterialStatus :: updateYourself(TimeStep *tStep)
 {
     StructuralInterfaceMaterialStatus :: updateYourself(tStep);
     shearStressShift = tempShearStressShift;
-}
-
-
-const FloatArray &
-SimpleInterfaceMaterialStatus :: giveShearStressShift()
-{
-    return shearStressShift;
 }
 
 

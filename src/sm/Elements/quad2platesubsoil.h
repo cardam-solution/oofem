@@ -68,7 +68,7 @@ public:
     // definition & identification
     const char *giveInputRecordName() const override { return _IFT_Quad2PlateSubSoil_Name; }
     const char *giveClassName() const override { return "Quad2PlateSubSoil"; }
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
 
     int computeNumberOfDofs() override { return 8; }
 
@@ -78,6 +78,12 @@ protected:
 
     void SPRNodalRecoveryMI_giveSPRAssemblyPoints(IntArray &pap) override;
     void SPRNodalRecoveryMI_giveDofMansDeterminedByPatch(IntArray &answer, int pap) override;
+    /**
+     * @name Surface load support
+     */
+    void computeNmatrixAt(const FloatArray &iLocCoord, FloatMatrix &answer) override;    
+    void computeSurfaceNMatrix(FloatMatrix &answer, int boundaryID, const FloatArray &lcoords) override;
+    
 };
 } // end namespace oofem
 #endif // quad2platesubsoil_H

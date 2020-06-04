@@ -49,20 +49,15 @@ CebFipSlip90Material :: CebFipSlip90Material(int n, Domain *d) : StructuralInter
 { }
 
 
-CebFipSlip90Material :: ~CebFipSlip90Material()
-{ }
-
-
-void
-CebFipSlip90Material :: giveEngTraction_1d(FloatArray &answer, GaussPoint *gp, const FloatArray &jump, TimeStep *tStep)
+double
+CebFipSlip90Material :: giveEngTraction_1d(double jump, GaussPoint *gp, TimeStep *tStep) const
 {
     CebFipSlip90MaterialStatus *status = static_cast< CebFipSlip90MaterialStatus * >( this->giveStatus(gp) );
-    double f, slip, tempKappa;
-
-    slip = jump.at(1);
+    double slip = jump; ///@todo This isn't slip, this is the normal displacement. This code should be rewritten to deal with a 3D jump.
     // compute value of loading function if strainLevel crit apply
-    f = fabs(slip) - status->giveKappa();
+    double f = fabs(slip) - status->giveKappa();
 
+    double tempKappa;
     if ( f <= 0.0 ) {
         // kappa do not grow
         tempKappa = status->giveKappa();
@@ -72,25 +67,25 @@ CebFipSlip90Material :: giveEngTraction_1d(FloatArray &answer, GaussPoint *gp, c
         // evaluate damage parameter
     }
 
-    answer.resize(1);
-    if ( tempKappa <= 1.e-12 ) {
-        answer.at(1) = 0.0;
-    } else {
-        answer.at(1) = ( this->computeBondForce(tempKappa) / tempKappa ) * slip;
+    double answer = 0.0;
+    if ( tempKappa > 1.e-12 ) {
+        answer = ( this->computeBondForce(tempKappa) / tempKappa ) * slip;
     }
 
     // update gp
-    status->letTempJumpBe(jump);
-    status->letTempTractionBe(answer);
+    status->letTempJumpBe({jump, 0., 0.});
+    status->letTempTractionBe({answer, 0., 0.});
     status->setTempKappa(tempKappa);
+
+    return answer;
 }
 
 
-void
-CebFipSlip90Material :: give1dStiffnessMatrix_Eng(FloatMatrix &answer,  MatResponseMode mode, GaussPoint *gp, TimeStep *tStep)
+FloatMatrixF<1,1>
+CebFipSlip90Material :: give1dStiffnessMatrix_Eng(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const
 {
     CebFipSlip90MaterialStatus *status = static_cast< CebFipSlip90MaterialStatus * >( this->giveStatus(gp) );
-    answer.resize(1, 1);
+    FloatMatrixF<1,1> answer;
 
     if ( mode == ElasticStiffness || mode == SecantStiffness ) {
         double kappa = status->giveKappa();
@@ -105,6 +100,7 @@ CebFipSlip90Material :: give1dStiffnessMatrix_Eng(FloatMatrix &answer,  MatRespo
     }  else {
         OOFEM_ERROR("unknown MatResponseMode (%s)", __MatResponseModeToString(mode) );
     }
+    return answer;
 }
 
 
@@ -113,7 +109,7 @@ CebFipSlip90Material :: giveIPValue(FloatArray &answer, GaussPoint *gp, Internal
 {
     CebFipSlip90MaterialStatus *status = static_cast< CebFipSlip90MaterialStatus * >( this->giveStatus(gp) );
 
-    if ( type == IST_DamageScalar ) {     
+    if ( type == IST_DamageScalar ) {
         answer.resize(1);
         answer.at(1) = status->giveKappa();
         return 1;
@@ -123,10 +119,10 @@ CebFipSlip90Material :: giveIPValue(FloatArray &answer, GaussPoint *gp, Internal
 }
 
 
-IRResultType
-CebFipSlip90Material :: initializeFrom(InputRecord *ir)
+void
+CebFipSlip90Material :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;                // Required by IR_GIVE_FIELD macro
+    StructuralInterfaceMaterial :: initializeFrom(ir);
 
     IR_GIVE_FIELD(ir, tmax, _IFT_CebFipSlip90Material_tmax);
     IR_GIVE_FIELD(ir, tres, _IFT_CebFipSlip90Material_tres);
@@ -136,7 +132,6 @@ CebFipSlip90Material :: initializeFrom(InputRecord *ir)
     IR_GIVE_FIELD(ir, s3, _IFT_CebFipSlip90Material_s3);
 
     alpha = 0.4;
-    return StructuralInterfaceMaterial :: initializeFrom(ir);
 }
 
 
@@ -155,7 +150,7 @@ CebFipSlip90Material :: giveInputRecord(DynamicInputRecord &input)
 
 
 double
-CebFipSlip90Material :: computeBondForce(double s)
+CebFipSlip90Material :: computeBondForce(double s) const
 {
     if ( s <= s1 ) {
         return tmax *pow( ( s / s1 ), alpha );
@@ -170,7 +165,7 @@ CebFipSlip90Material :: computeBondForce(double s)
 
 
 double
-CebFipSlip90Material :: computeBondForceStiffness(double s)
+CebFipSlip90Material :: computeBondForceStiffness(double s) const
 {
     if ( s <= s1 / 1000. ) {
         s = s1 / 1000.;
@@ -187,18 +182,12 @@ CebFipSlip90Material :: computeBondForceStiffness(double s)
 }
 
 
-CebFipSlip90MaterialStatus :: CebFipSlip90MaterialStatus(int n, Domain *d, GaussPoint *g) : StructuralInterfaceMaterialStatus(n, d, g)
-{
-    kappa = tempKappa = 0.0;
-}
-
-
-CebFipSlip90MaterialStatus :: ~CebFipSlip90MaterialStatus()
-{ }
+CebFipSlip90MaterialStatus :: CebFipSlip90MaterialStatus(GaussPoint *g) : StructuralInterfaceMaterialStatus(g)
+{}
 
 
 void
-CebFipSlip90MaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep)
+CebFipSlip90MaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep) const
 {
     StructuralInterfaceMaterialStatus :: printOutputAt(file, tStep);
     fprintf(file, "status { ");

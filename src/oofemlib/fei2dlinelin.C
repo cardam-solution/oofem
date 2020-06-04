@@ -36,9 +36,16 @@
 #include "mathfem.h"
 #include "floatmatrix.h"
 #include "floatarray.h"
+#include "floatarrayf.h"
 #include "gaussintegrationrule.h"
 
 namespace oofem {
+
+FloatArrayF<2> FEI2dLineLin :: evalN(double xi)
+{
+    return {( 1. - xi ) * 0.5, ( 1. + xi ) * 0.5};
+}
+
 void FEI2dLineLin :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
 {
     double xi = lcoords(0);
@@ -79,7 +86,9 @@ int FEI2dLineLin :: global2local(FloatArray &answer, const FloatArray &gcoords, 
     double y2_y1 = cellgeo.giveVertexCoordinates(2).at(yind) - cellgeo.giveVertexCoordinates(1).at(yind);
 
     // Projection of the global coordinate gives the value interpolated in [0,1].
-    double xi = ( x2_x1 * gcoords(0) + y2_y1 * gcoords(1) ) / ( sqrt(x2_x1 * x2_x1 + y2_y1 * y2_y1) );
+    double dx = gcoords(0) - cellgeo.giveVertexCoordinates(1).at(xind);
+    double dy = gcoords(1) - cellgeo.giveVertexCoordinates(1).at(yind);
+    double xi = (x2_x1) ? ( sqrt( dx*dx*(1 + (y2_y1 / x2_x1)*(y2_y1 / x2_x1) )) ) / ( sqrt(x2_x1 * x2_x1 + y2_y1 * y2_y1) ) : sqrt(dy*dy) / ( sqrt(x2_x1 * x2_x1 + y2_y1 * y2_y1) );
     // Map to [-1,1] domain.
     xi = xi * 2 - 1;
 
@@ -109,8 +118,8 @@ void FEI2dLineLin :: edgeEvaldNds(FloatArray &answer, int iedge,
 double FEI2dLineLin :: edgeEvalNormal(FloatArray &normal, int iedge, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
 {
     normal.resize(2);
-    normal.at(1) = cellgeo.giveVertexCoordinates(2).at(xind) - cellgeo.giveVertexCoordinates(1).at(xind);
-    normal.at(2) = -( cellgeo.giveVertexCoordinates(2).at(yind) - cellgeo.giveVertexCoordinates(1).at(yind) );
+    normal.at(1) = cellgeo.giveVertexCoordinates(2).at(yind) - cellgeo.giveVertexCoordinates(1).at(yind);
+    normal.at(2) = -( cellgeo.giveVertexCoordinates(2).at(xind) - cellgeo.giveVertexCoordinates(1).at(xind) );
     return normal.normalize() * 0.5;
 }
 
@@ -121,18 +130,18 @@ double FEI2dLineLin :: giveTransformationJacobian(const FloatArray &lcoords, con
     return sqrt(x2_x1 * x2_x1 + y2_y1 * y2_y1) / 2.0;
 }
 
-void FEI2dLineLin :: boundaryEdgeGiveNodes(IntArray &answer, int boundary)
+IntArray FEI2dLineLin :: boundaryEdgeGiveNodes(int boundary) const
 {
-    answer = {1, 2};
+    return {1, 2};
 }
 
-void FEI2dLineLin :: computeLocalEdgeMapping(IntArray &edgeNodes, int iedge)
+IntArray FEI2dLineLin :: computeLocalEdgeMapping(int iedge) const
 {
     if ( iedge != 1 ) {
         OOFEM_ERROR("wrong egde number (%d)", iedge);
     }
 
-    edgeNodes = {1, 2};
+    return {1, 2};
 }
 
 void FEI2dLineLin :: edgeEvalN(FloatArray &answer, int iedge, const FloatArray &lcoords, const FEICellGeometry &cellgeo)
@@ -140,7 +149,7 @@ void FEI2dLineLin :: edgeEvalN(FloatArray &answer, int iedge, const FloatArray &
     this->evalN(answer, lcoords, cellgeo);
 }
 
-double FEI2dLineLin :: edgeComputeLength(IntArray &edgeNodes, const FEICellGeometry &cellgeo)
+double FEI2dLineLin :: edgeComputeLength(const IntArray &edgeNodes, const FEICellGeometry &cellgeo) const
 {
     double x2_x1 = cellgeo.giveVertexCoordinates(2).at(xind) - cellgeo.giveVertexCoordinates(1).at(xind);
     double y2_y1 = cellgeo.giveVertexCoordinates(2).at(yind) - cellgeo.giveVertexCoordinates(1).at(yind);

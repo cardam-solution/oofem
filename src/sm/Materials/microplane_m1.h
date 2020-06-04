@@ -61,8 +61,7 @@ protected:
     IntArray plasticState;
 
 public:
-    M1MaterialStatus(int n, Domain *d, GaussPoint *g);
-    virtual ~M1MaterialStatus();
+    M1MaterialStatus(GaussPoint *g);
 
     const char *giveClassName() const override { return "M1MaterialStatus"; }
     void letTempNormalMplaneStressesBe(FloatArray sigmaN) { tempSigN =  std :: move(sigmaN); }
@@ -74,7 +73,7 @@ public:
     const FloatArray &giveTempNormalMplanePlasticStrains() { return tempEpspN; }
     const IntArray &givePlasticStateIndicators() { return plasticState; }
     void initTempStatus() override;
-    void printOutputAt(FILE *file, TimeStep *tStep) override;
+    void printOutputAt(FILE *file, TimeStep *tStep) const override;
     void updateYourself(TimeStep *tStep) override;
 
     void saveContext(DataStream &stream, ContextMode mode) override;
@@ -87,10 +86,10 @@ public:
 class M1Material : public MicroplaneMaterial
 {
 protected:
-    double EN; // normal microplane elastic modulus
-    double ENtan; // normal microplane tangent (elastoplastic) modulus
-    double HN; // normal microplane hardening/softening modulus
-    double s0; // normal microplane initial yield stress
+    double EN = 0.; // normal microplane elastic modulus
+    double ENtan = 0.; // normal microplane tangent (elastoplastic) modulus
+    double HN = 0.; // normal microplane hardening/softening modulus
+    double s0 = 0.; // normal microplane initial yield stress
 
 public:
     /**
@@ -99,21 +98,15 @@ public:
      * @param d Domain to which newly created material belongs.
      */
     M1Material(int n, Domain *d);
-    /// Destructor.
-    virtual ~M1Material() { }
 
-    void giveRealStressVector_3d(FloatArray &answer, GaussPoint *gp,
-                                 const FloatArray &reducedStrain, TimeStep *tStep) override;
-    void give3dMaterialStiffnessMatrix(FloatMatrix &answer,
-                                       MatResponseMode mode,
-                                       GaussPoint *gp,
-                                       TimeStep *tStep) override;
+    FloatArrayF<6> giveRealStressVector_3d(const FloatArrayF<6> &strain, GaussPoint *gp, TimeStep *tStep) const override;
+    FloatMatrixF<6,6> give3dMaterialStiffnessMatrix(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const override;
 
     const char *giveClassName() const override { return "M1Material"; }
     const char *giveInputRecordName() const override { return _IFT_M1Material_Name; }
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
 
-    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new M1MaterialStatus(1, domain, gp); }
+    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new M1MaterialStatus(gp); }
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
 };
@@ -147,8 +140,7 @@ protected:
     FloatArray sigN, tempSigN, sigNyield;
 
 public:
-    M1MaterialStatus(int n, Domain *d, GaussPoint *g);
-    virtual ~M1MaterialStatus();
+    M1MaterialStatus(GaussPoint *g);
 
     // definition
     const char *giveClassName() const override { return "M1MaterialStatus"; }
@@ -172,12 +164,12 @@ public:
 class M1Material : public StructuralMaterial
 {
 protected:
-    double E; // Young's modulus
-    double nu; // Poisson ratio
-    double EN; // normal microplane elastic modulus
-    double HN; // normal microplane hardening/softening modulus
-    double s0; // normal microplane initial yield stress
-    int nmp; // number of microplanes
+    double E = 0.; // Young's modulus
+    double nu = 0.; // Poisson ratio
+    double EN = 0.; // normal microplane elastic modulus
+    double HN = 0.; // normal microplane hardening/softening modulus
+    double s0 = 0.; // normal microplane initial yield stress
+    int nmp = 0; // number of microplanes
     FloatMatrix n; // microplane normals
     FloatMatrix N; // N = n x n in Voigt notation
     FloatMatrix NN; // NN = n x n x n x n in special notation
@@ -190,8 +182,6 @@ public:
      * @param d Domain to which newly created material belongs.
      */
     M1Material(int n, Domain *d);
-    /// Destructor.
-    virtual ~M1Material() { }
 
     void giveRealStressVector_PlaneStress(FloatArray &answer, GaussPoint *gp,
                                           const FloatArray &reducedStrain, TimeStep *tStep) override;
@@ -199,9 +189,9 @@ public:
     void givePlaneStressStiffMtrx(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) override;
     const char *giveClassName() const override { return "M1Material"; }
     const char *giveInputRecordName() const override { return _IFT_M1Material_Name; }
-    IRResultType initializeFrom(InputRecord *ir) override;
-    int hasMaterialModeCapability(MaterialMode mode) override;
-    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new M1MaterialStatus(1, domain, gp); }
+    void initializeFrom(InputRecord &ir) override;
+    bool hasMaterialModeCapability(MaterialMode mode) const override;
+    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new M1MaterialStatus(gp); }
 
 protected:
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;

@@ -37,7 +37,9 @@
 #include "gausspoint.h"
 #include "gaussintegrationrule.h"
 #include "floatmatrix.h"
+#include "floatmatrixf.h"
 #include "floatarray.h"
+#include "floatarrayf.h"
 #include "intarray.h"
 #include "mathfem.h"
 #include "fei2dlinelin.h"
@@ -117,22 +119,22 @@ InterfaceElem2dLin :: computeVolumeAround(GaussPoint *gp)
 void
 InterfaceElem2dLin :: computeStressVector(FloatArray &answer, const FloatArray &strain, GaussPoint *gp, TimeStep *tStep)
 {
-    static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->giveEngTraction_2d(answer, gp, strain, tStep);
+    answer = static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->giveEngTraction_2d(strain, gp, tStep);
 }
 
 
 void
 InterfaceElem2dLin :: computeConstitutiveMatrixAt(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep)
 {
-    static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->give2dStiffnessMatrix_Eng(answer, rMode, gp, tStep);
+    answer = static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->give2dStiffnessMatrix_Eng(rMode, gp, tStep);
 }
 
 
-IRResultType
-InterfaceElem2dLin :: initializeFrom(InputRecord *ir)
+void
+InterfaceElem2dLin :: initializeFrom(InputRecord &ir)
 {
-    this->axisymmode = ir->hasField(_IFT_InterfaceElem2dLin_axisymmode);
-    return StructuralElement :: initializeFrom(ir);
+    this->axisymmode = ir.hasField(_IFT_InterfaceElem2dLin_axisymmode);
+    StructuralElement :: initializeFrom(ir);
 }
 
 

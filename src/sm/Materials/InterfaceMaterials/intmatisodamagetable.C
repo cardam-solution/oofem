@@ -47,19 +47,14 @@
 namespace oofem {
 REGISTER_Material(IntMatIsoDamageTable);
 
-IntMatIsoDamageTable :: IntMatIsoDamageTable(int n, Domain *d) : IntMatIsoDamage(n, d){}
+IntMatIsoDamageTable :: IntMatIsoDamageTable(int n, Domain *d) : IntMatIsoDamage(n, d) {}
 
 
-
-IntMatIsoDamageTable :: ~IntMatIsoDamageTable(){}
-
-
-
-
-IRResultType
-IntMatIsoDamageTable :: initializeFrom(InputRecord *ir)
+void
+IntMatIsoDamageTable :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;                // Required by IR_GIVE_FIELD macro
+    StructuralInterfaceMaterial :: initializeFrom(ir);
+
     std :: ifstream is;
     int nbrOfLinesToRead;
 
@@ -111,8 +106,6 @@ IntMatIsoDamageTable :: initializeFrom(InputRecord *ir)
     // We add e0 to the tableJumps since these should be given as the increase in
     // strain relative to e0.
     tableJumps.add(e0);
-
-    return StructuralInterfaceMaterial :: initializeFrom(ir);
 }
 
 
@@ -129,16 +122,15 @@ IntMatIsoDamageTable :: giveInputRecord(DynamicInputRecord &input)
 }
 
 
-
-void
-IntMatIsoDamageTable :: computeDamageParam(double &omega, double kappa)
+double
+IntMatIsoDamageTable :: computeDamageParam(double kappa) const
 {
     if ( kappa > this->e0 ) {
         // Linear interpolation between able values.
 
         // If out of bounds damage is set to the last given damage value in the table
         if ( kappa >= tableJumps.at( tableJumps.giveSize() ) ) {
-            omega = tableDamages.at( tableDamages.giveSize() );
+            return tableDamages.at( tableDamages.giveSize() );
         } else {
             // std::lower_bound uses binary search to find index with value bounding kappa from above
             int index = (int)(std :: lower_bound(tableJumps.givePointer(), tableJumps.givePointer() + tableJumps.giveSize(), kappa) - tableJumps.givePointer());
@@ -160,14 +152,11 @@ IntMatIsoDamageTable :: computeDamageParam(double &omega, double kappa)
             double y1 = tableDamages(index );
 
             // Interpolation formula
-            omega = y0 + ( y1 - y0 ) * ( kappa - x0 ) / ( x1 - x0 );
+            return y0 + ( y1 - y0 ) * ( kappa - x0 ) / ( x1 - x0 );
         }
     } else {
-        omega = 0.0;
+        return 0.0;
     }
 }
-
-
-
 
 } // end namespace oofem

@@ -56,7 +56,7 @@ FEI1dLin Truss1d :: interp(1); // Initiates the static interpolator
 
 
 Truss1d :: Truss1d(int n, Domain *aDomain) :
-    StructuralElement(n, aDomain),
+    NLStructuralElement(n, aDomain),
     ZZNodalRecoveryModelInterface(this), NodalAveragingRecoveryModelInterface(),
     SpatialLocalizerInterface(this),
     ZZErrorEstimatorInterface(this),
@@ -70,8 +70,8 @@ void Truss1d :: computeGaussPoints()
 // Sets up the array of Gauss Points of the receiver.
 {
     if ( integrationRulesArray.size() == 0 ) {
-        integrationRulesArray.resize( 1 );
-        integrationRulesArray [ 0 ] = std::make_unique<GaussIntegrationRule>(1, this, 1, 2);
+        integrationRulesArray.resize(1);
+        integrationRulesArray [ 0 ] = std :: make_unique< GaussIntegrationRule >(1, this, 1, 2);
         this->giveCrossSection()->setupIntegrationPoints(* integrationRulesArray [ 0 ], 1, this);
     }
 }
@@ -139,26 +139,28 @@ Truss1d :: computeVolumeAround(GaussPoint *gp)
 // Gauss point is used.
 {
     double detJ = fabs( this->interp.giveTransformationJacobian( gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this) ) );
-    return detJ *gp->giveWeight() * this->giveCrossSection()->give(CS_Area, gp);
+    return detJ * gp->giveWeight() * this->giveCrossSection()->give(CS_Area, gp);
 }
 
 
 void
 Truss1d :: computeStressVector(FloatArray &answer, const FloatArray &strain, GaussPoint *gp, TimeStep *tStep)
 {
-    this->giveStructuralCrossSection()->giveRealStress_1d(answer, gp, strain, tStep);
+    answer = this->giveStructuralCrossSection()->giveRealStress_1d(strain, gp, tStep);
 }
 
 void
 Truss1d :: computeConstitutiveMatrixAt(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep)
 {
-    this->giveStructuralCrossSection()->giveStiffnessMatrix_1d(answer, rMode, gp, tStep);
+    answer = this->giveStructuralCrossSection()->giveStiffnessMatrix_1d(rMode, gp, tStep);
 }
 
 void
 Truss1d :: giveDofManDofIDMask(int inode, IntArray &answer) const
 {
-    answer = {D_u};
+    answer = {
+        D_u
+    };
 }
 
 
@@ -170,24 +172,24 @@ Truss1d :: HuertaErrorEstimatorI_setupRefinedElementProblem(RefinedElement *refi
                                                             IntArray &controlNode, IntArray &controlDof,
                                                             HuertaErrorEstimator :: AnalysisMode aMode)
 {
-    int inode, nodes = 2;
-    FloatArray *corner [ 2 ], midNode, cor [ 2 ];
-    double x = 0.0;
+    int nodes = 2;
 
+    FloatArray corner [ 2 ], midNode, cor [ 2 ];
     if ( sMode == HuertaErrorEstimatorInterface :: NodeMode ||
-        ( sMode == HuertaErrorEstimatorInterface :: BCMode && aMode == HuertaErrorEstimator :: HEE_linear ) ) {
-        for ( inode = 0; inode < nodes; inode++ ) {
+         ( sMode == HuertaErrorEstimatorInterface :: BCMode && aMode == HuertaErrorEstimator :: HEE_linear ) ) {
+        double x = 0.0;
+        for ( int inode = 0; inode < nodes; inode++ ) {
             corner [ inode ] = this->giveNode(inode + 1)->giveCoordinates();
-            if ( corner [ inode ]->giveSize() != 3 ) {
+            if ( corner [ inode ].giveSize() != 3 ) {
                 cor [ inode ].resize(3);
-                cor [ inode ].at(1) = corner [ inode ]->at(1);
+                cor [ inode ].at(1) = corner [ inode ].at(1);
                 cor [ inode ].at(2) = 0.0;
                 cor [ inode ].at(3) = 0.0;
 
-                corner [ inode ] = & ( cor [ inode ] );
+                corner [ inode ] = cor [ inode ];
             }
 
-            x += corner [ inode ]->at(1);
+            x += corner [ inode ].at(1);
         }
 
         midNode.resize(3);
@@ -397,5 +399,4 @@ Truss1d :: NodalAveragingRecoveryMI_computeNodalValue(FloatArray &answer, int no
     GaussPoint *gp = integrationRulesArray [ 0 ]->getIntegrationPoint(0);
     this->giveIPValue(answer, gp, type, tStep);
 }
-
 } // end namespace oofem

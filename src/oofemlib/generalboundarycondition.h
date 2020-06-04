@@ -122,6 +122,18 @@ public:
     Function *giveTimeFunction();
 
     /**
+     * Gets the activity time function number.
+     */
+    int getIsImposedTimeFunctionNumber(){ return this->isImposedTimeFunction; }
+
+
+    /**
+     * Sets the activity time function of receiver.
+     * @param funcIndx Index of new time function.
+     */
+    void setIsImposedTimeFunctionNumber(int funcIndx){ this->isImposedTimeFunction = funcIndx; }
+
+    /**
      * Returns receiver load type. It distinguish particular boundary conditions according to
      * their "physical" meaning (like StructuralTemperatureLoadLT, StructuralLoadLT).
      * Derived classes should always overload, default implementation returns UnknownLT value.
@@ -162,7 +174,7 @@ public:
     virtual void postInitialize() { }
 
     // Overloaded methods:
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
     void giveInputRecord(DynamicInputRecord &input) override;
 
     void saveContext(DataStream &stream, ContextMode mode) override;

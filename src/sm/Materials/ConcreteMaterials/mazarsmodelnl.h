@@ -54,15 +54,13 @@ class MazarsNLMaterialStatus : public MazarsMaterialStatus, public StructuralNon
 {
 protected:
     /// Equivalent strain for averaging.
-    double localEquivalentStrainForAverage;
+    double localEquivalentStrainForAverage = 0.;
 
 public:
     /// Constructor
-    MazarsNLMaterialStatus(int n, Domain * d, GaussPoint * g);
-    /// Destructor
-    virtual ~MazarsNLMaterialStatus();
+    MazarsNLMaterialStatus(GaussPoint * g);
 
-    void printOutputAt(FILE *file, TimeStep *tStep) override;
+    void printOutputAt(FILE *file, TimeStep *tStep) const override;
 
     /// Returns the local equivalent strain to be averaged.
     double giveLocalEquivalentStrainForAverage() { return localEquivalentStrainForAverage; }
@@ -100,20 +98,18 @@ class MazarsNLMaterial : public MazarsMaterial, public StructuralNonlocalMateria
 {
 protected:
     /// Interaction radius, related to the nonlocal characteristic length of material.
-    double R;
+    double R = 0.;
 
 public:
     /// Constructor
     MazarsNLMaterial(int n, Domain * d);
-    /// Destructor
-    virtual ~MazarsNLMaterial();
 
     const char *giveClassName() const override { return "MazarsNLMaterial"; }
 
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
     Interface *giveInterface(InterfaceType it) override;
 
-    void computeEquivalentStrain(double &kappa, const FloatArray &strain, GaussPoint *gp, TimeStep *tStep) override;
+    double computeEquivalentStrain(const FloatArray &strain, GaussPoint *gp, TimeStep *tStep) const override;
     /**
      * Computes the equivalent local strain measure from given strain vector (full form).
      * @param[out] kappa Return parameter, containing the corresponding equivalent strain
@@ -121,25 +117,25 @@ public:
      * @param gp Integration point.
      * @param tStep Time step.
      */
-    void computeLocalEquivalentStrain(double &kappa, const FloatArray &strain, GaussPoint *gp, TimeStep *tStep)
-    { MazarsMaterial :: computeEquivalentStrain(kappa, strain, gp, tStep); }
+    double computeLocalEquivalentStrain(const FloatArray &strain, GaussPoint *gp, TimeStep *tStep) const
+    { return MazarsMaterial :: computeEquivalentStrain(strain, gp, tStep); }
 
-    void updateBeforeNonlocAverage(const FloatArray &strainVector, GaussPoint *gp, TimeStep *tStep) override;
-    double computeWeightFunction(const FloatArray &src, const FloatArray &coord) override;
-    int hasBoundedSupport() override { return 1; }
+    void updateBeforeNonlocAverage(const FloatArray &strainVector, GaussPoint *gp, TimeStep *tStep) const override;
+    double computeWeightFunction(const FloatArray &src, const FloatArray &coord) const override;
+    int hasBoundedSupport() const override { return 1; }
     /**
      * Determines the width (radius) of limited support of weighting function
      */
-    virtual void giveSupportRadius(double &radius) { radius = this->R; }
+    virtual double giveSupportRadius() const { return this->R; }
 
     int packUnknowns(DataStream &buff, TimeStep *tStep, GaussPoint *ip) override;
     int unpackAndUpdateUnknowns(DataStream &buff, TimeStep *tStep, GaussPoint *ip) override;
     int estimatePackSize(DataStream &buff, GaussPoint *ip) override;
 
-    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new MazarsNLMaterialStatus(1, MazarsMaterial :: domain, gp); }
+    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new MazarsNLMaterialStatus(gp); }
 
 protected:
-    void initDamaged(double kappa, FloatArray &totalStrainVector, GaussPoint *gp) override;
+    void initDamaged(double kappa, FloatArray &totalStrainVector, GaussPoint *gp) const override;
 };
 } // end namespace oofem
 #endif // mazarsmodelnl_h

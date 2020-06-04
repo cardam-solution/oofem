@@ -118,22 +118,22 @@ Tria1PlateSubSoil :: computeBmatrixAt(GaussPoint *gp, FloatMatrix &answer, int l
 void
 Tria1PlateSubSoil :: computeStressVector(FloatArray &answer, const FloatArray &strain, GaussPoint *gp, TimeStep *tStep)
 {
-    this->giveStructuralCrossSection()->giveGeneralizedStress_PlateSubSoil(answer, gp, strain, tStep);
+    answer = this->giveStructuralCrossSection()->giveGeneralizedStress_PlateSubSoil(strain, gp, tStep);
 }
 
 
 void
 Tria1PlateSubSoil :: computeConstitutiveMatrixAt(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep)
 {
-    this->giveStructuralCrossSection()->give2dPlateSubSoilStiffMtrx(answer, rMode, gp, tStep);
+    answer = this->giveStructuralCrossSection()->give2dPlateSubSoilStiffMtrx(rMode, gp, tStep);
 }
 
 
-IRResultType
-Tria1PlateSubSoil :: initializeFrom(InputRecord *ir)
+void
+Tria1PlateSubSoil :: initializeFrom(InputRecord &ir)
 {
     this->numberOfGaussPoints = 1;
-    return StructuralElement :: initializeFrom(ir);
+    StructuralElement :: initializeFrom(ir);
 }
 
 
@@ -148,8 +148,8 @@ void
 Tria1PlateSubSoil :: computeMidPlaneNormal(FloatArray &answer, const GaussPoint *gp)
 {
     FloatArray u, v;
-    u.beDifferenceOf( * this->giveNode(2)->giveCoordinates(), * this->giveNode(1)->giveCoordinates() );
-    v.beDifferenceOf( * this->giveNode(3)->giveCoordinates(), * this->giveNode(1)->giveCoordinates() );
+    u.beDifferenceOf( this->giveNode(2)->giveCoordinates(), this->giveNode(1)->giveCoordinates() );
+    v.beDifferenceOf( this->giveNode(3)->giveCoordinates(), this->giveNode(1)->giveCoordinates() );
 
     answer.beVectorProductOf(u, v);
     answer.normalize();
@@ -232,40 +232,53 @@ Tria1PlateSubSoil :: SPRNodalRecoveryMI_giveDofMansDeterminedByPatch(IntArray &a
     }
 }
 
-
 void
-Tria1PlateSubSoil :: computeSurfaceNMatrixAt(FloatMatrix &answer, int iSurf, GaussPoint *sgp)
+Tria1PlateSubSoil ::computeNmatrixAt(const FloatArray &iLocCoord, FloatMatrix &answer)
+// Returns the [1x3] displacement interpolation matrix {N}
 {
-  this->computeNmatrixAt(sgp->giveNaturalCoordinates(), answer);
+    FloatArray N(3);
+    giveInterpolation()->evalN(N, iLocCoord, FEIElementGeometryWrapper(this) );
+    answer.beNMatrixOf(N, 1);
 }
 
+
 void
-Tria1PlateSubSoil :: giveSurfaceDofMapping(IntArray &answer, int iSurf) const
+Tria1PlateSubSoil :: computeSurfaceNMatrix(FloatMatrix &answer, int boundaryID, const FloatArray &lcoords)
 {
-    answer.resize(3);
-    answer.zero();
-    if ( iSurf == 1 ) {
-        for (int i = 1; i<=3; i++) {
-            answer.at(i) = i;
-        }
+    if (boundaryID == 1) {
+        this->computeNmatrixAt(lcoords, answer);
     } else {
-        OOFEM_ERROR("wrong surface number");
+        OOFEM_ERROR("computeSurfaceNMatrix: Only one surface is supported with id=1");
     }
 }
 
-
-double
-Tria1PlateSubSoil :: computeSurfaceVolumeAround(GaussPoint *gp, int iSurf)
-{
-    return this->computeVolumeAround(gp);
-}
-
-
-int
-Tria1PlateSubSoil :: computeLoadLSToLRotationMatrix(FloatMatrix &answer, int isurf, GaussPoint *gp)
-{
-    return 0;
-}
+// void
+// Tria1PlateSubSoil :: giveSurfaceDofMapping(IntArray &answer, int iSurf) const
+// {
+//     answer.resize(3);
+//     answer.zero();
+//     if ( iSurf == 1 ) {
+//         for (int i = 1; i<=3; i++) {
+//             answer.at(i) = i;
+//         }
+//     } else {
+//         OOFEM_ERROR("wrong surface number");
+//     }
+// }
+// 
+// 
+// double
+// Tria1PlateSubSoil :: computeSurfaceVolumeAround(GaussPoint *gp, int iSurf)
+// {
+//     return this->computeVolumeAround(gp);
+// }
+// 
+// 
+// int
+// Tria1PlateSubSoil :: computeLoadLSToLRotationMatrix(FloatMatrix &answer, int isurf, GaussPoint *gp)
+// {
+//     return 0;
+// }
 
 
 } // end namespace oofem

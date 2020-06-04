@@ -365,6 +365,31 @@ The element is defined in x,y plane. The element features are summarized in Tabl
 \elementDescription{Unknowns}{Three dofs ($u$-displacement, $v$-displacement, $w$-rotation) are required in each node.}
 \end{elementsummary}
 
+The theory of lattice2d is described in the paper ``P. Grassl and M. Jir\'{a}sek. Meso-scale approach to modelling the fracture process zone of concrete subjected to uniaxial tension. International Journal of Solids and Structures. Volume 47, Issues 7-8, pp. 957-968, 2010.''
+
+\subsubsection{Lattice2dboundary}
+Represents three-node lattice element for boundary of 2d periodic cells. The first two nodes have 3 degrees of freedom as for the element lattice2d. The third node is used to control the loading of the periodic cell using two normal (xx and yy) and one shear strain (xy) component.
+The element is defined in x,y plane. 
+
+The theory pf lattice2dbounday is described in the paper ``P. Grassl and M. Jir\'{a}sek. Meso-scale approach to modelling the fracture process zone of concrete subjected to uniaxial tension. International Journal of Solids and Structures. Volume 47, Issues 7-8, pp. 957-968, 2010.''
+
+\subsubsection{Lattice3d}
+Represents two-node 3d lattice element. Each node has six degrees of freedom.
+The theory of lattice3d is described in the paper ``P. Grassl, J. Bolander. Three-Dimensional Network Model for Coupling of Fracture and Mass Transport in Quasi-Brittle Geomaterials, Materials, 9, 782, 2016.''
+
+\subsubsection{Lattice3dboundary}
+Represents three-noded 3d lattice element for boundary of 3d periodic cells. The first two nodes have 6 degrees of freedom as for the element lattice3d. The third node is used to control the loading of the periodic cell using three normal (xx, yy and zz) and three shear strain (yz, xz, xy) components.
+
+The theory of lattice3dboundary is described in the paper ``I. Athanasiadis, S. Wheeler and P. Grassl. Hydro-mechanical network modelling of particulate composites, International Journal of Solids and Structures. Vol. 130-131, Pages 49-60, 2018.''
+
+\subsubsection{Latticelink3d}
+Represents two-node 3d link element connecting 3d beam and 3d lattice elements. Each node has six degrees of freedom.
+The theory of latticelink3d is described in the paper ``P. Grassl and A. Antonelli. 3D network modelling of fracture processes in fibre-reinforced geomaterials, International Journal of Solids and Structures, vol. 156-157, Pages 234-242, 2019.''
+
+\subsubsection{Latticelink3dboundary}
+Represents three-node 3d boundary link element connecting 3d beam and 3d lattice elements. The first two nodes have the same meaning as for latticelink3d. The third node is used to control the loading of the periodic cell using three normal (xx, yy and zz) and three shear strain (yz, xz, xy) components.
+
+The theory of latticelink3dboundary is described in the paper ``P. Grassl and A. Antonelli. 3D network modelling of fracture processes in fibre-reinforced geomaterials, International Journal of Solids and Structures, vol. 156-157, Pages 234-242, 2019.''
 
 %-----------------------------------------------------------------------------------------------
 \clearpage
@@ -1281,8 +1306,7 @@ w-displacement) are required in each node, according to element mode (determined
 
 \subsubsection{IntElLine1, Interface2dlin elements}
 Implementation of a two dimensional line element with a linear approximation of the displacement jump. 
-The element can be used to tie together two element edges and is defined by four nodes - two on each edge. Note that, the nodes along the interface are doubled, each couple with identical coordinates. Nodes on the negative side are numbered first, followed by nodes on the positive part. Requires material model with \_2dInterface support.  The element features are summarized in Table~\ref{Interface2dlinsummary}.
-
+The element can be used to tie together two element edges and is defined by four nodes - two on each edge. Note that, the nodes along the interface are doubled, each couple with identical coordinates. Nodes on the negative side are numbered first, followed by nodes on the positive part. Requires material model with \_2dInterface support.  The element features are summarized in Table~\ref{IntElLine1}.
 \begin{figure}[htb]
  \centering
  \begin{makeimage}
@@ -1308,7 +1332,7 @@ The element can be used to tie together two element edges and is defined by four
 
 \subsubsection{IntElLine2, Interface2dquad elements}
 Implementation of a two dimensional interface element with quadratic
-approximation of displacement field. Can be used to glue together two elements with quadratic displacement approximation along the shared edge. Note, that the nodes along the interface are doubled, each couple with identical coordinates. Nodes on the negative side are numbered first, followed by nodes on the positive part. Requires material model with \_2dInterface support.  The element features are summarized in Table~\ref{Interface2dquadsummary}.
+approximation of displacement field. Can be used to glue together two elements with quadratic displacement approximation along the shared edge. Note, that the nodes along the interface are doubled, each couple with identical coordinates. Nodes on the negative side are numbered first, followed by nodes on the positive part. Requires material model with \_2dInterface support. The element features are summarized in Table~\ref{IntElLine2}.
 
 \begin{figure}[htb]
  \centering
@@ -1630,7 +1654,7 @@ heat transfer problems. Each node has 1 degree of freedom.
 Problem should be defined in x,y plane. The cross section thickness
 property is requested form cross section model.
 The nodes should be numbered anti-clockwise (positive rotation around
-z-axis).  The element features are summarized in Table~\ref{Quad1htsummary}.
+z-axis). The element features are summarized in Table~\ref{Quad1htsummary}.
 
 \begin{figure}[htb]
  \centering
@@ -1669,10 +1693,25 @@ Other features are the same as for Quad1ht in Section~\ref{Quad1ht}.
 
 \subsubsection{Quad1hmt element}
 Represents isoparametric four-node quadrilateral finite element for
-heat and mass (one constituent) transfer problems. 
+heat and mass (one constituent) transport problems. 
 Two dofs (T\_f - temperature and C\_1 - concentration) are required in
 each node. Linear approximation of temperature and mass concentration.
 Other features are similar to Quad1 element, see section \ref{Quad1ht}.
+
+\subsubsection{QQuad1ht element}
+\label{QQuad1ht}
+Represents isoparametric quadratic eight-node quadrilateral finite element for
+heat transfer problems. Each node has 1 degree of freedom.
+Problem should be defined in x,y plane. The cross section thickness
+property is requested form the cross section model.
+The nodes should be numbered anti-clockwise (positive rotation around
+z-axis), see fig.~\ref{qplanstrssfig}. The element has the same features as in Table~\ref{Quad1htsummary}.
+
+\subsubsection{QQuad1mt element}
+Element for mass transport problems, see the parent element in sec.~\ref{QQuad1ht}. 
+
+\subsubsection{QQuad1hmt element}
+Element for heat and mass transport problems, see the parent element in sec.~\ref{QQuad1ht}.
 
 %-----------------------------------------------------------------------------------------------
 \clearpage

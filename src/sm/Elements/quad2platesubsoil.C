@@ -99,11 +99,11 @@ Quad2PlateSubSoil :: computeBmatrixAt(GaussPoint *gp, FloatMatrix &answer, int l
 }
 
 
-IRResultType
-Quad2PlateSubSoil :: initializeFrom(InputRecord *ir)
+void
+Quad2PlateSubSoil :: initializeFrom(InputRecord &ir)
 {
     this->numberOfGaussPoints = 4;
-    return StructuralElement :: initializeFrom(ir);
+    StructuralElement :: initializeFrom(ir);
 }
 
 
@@ -134,6 +134,26 @@ Quad2PlateSubSoil :: SPRNodalRecoveryMI_giveDofMansDeterminedByPatch(IntArray &a
         OOFEM_ERROR("node %d not found on element %d", pap, this->giveNumber());
     }
 }
+
+void
+Quad2PlateSubSoil ::computeNmatrixAt(const FloatArray &iLocCoord, FloatMatrix &answer)
+// Returns the [1x8] displacement interpolation matrix {N}
+{
+    FloatArray N(8);
+    giveInterpolation()->evalN(N, iLocCoord, FEIElementGeometryWrapper(this) );
+    answer.beNMatrixOf(N, 1);
+}
+
+void
+Quad2PlateSubSoil :: computeSurfaceNMatrix(FloatMatrix &answer, int boundaryID, const FloatArray &lcoords)
+{
+    if (boundaryID == 1) {
+        this->computeNmatrixAt(lcoords, answer);
+    } else {
+        OOFEM_ERROR("computeSurfaceNMatrix: Only one surface is supported with id=1");
+    }
+}
+
 
 
 } // end namespace oofem

@@ -87,12 +87,46 @@ LSpace :: giveInterface(InterfaceType interface)
 }
 
 
-IRResultType
-LSpace :: initializeFrom(InputRecord *ir)
+void
+LSpace :: initializeFrom(InputRecord &ir)
 {
     numberOfGaussPoints = 8;
-    return Structural3DElement :: initializeFrom(ir);
+    Structural3DElement :: initializeFrom(ir);
+    this->reducedShearIntegration = ir.hasField(_IFT_LSpace_reducedShearIntegration);
 }
+
+
+
+void
+LSpace :: computeBmatrixAt(GaussPoint *gp, FloatMatrix &answer, int li, int ui)
+// Returns the [ 6 x (nno*3) ] strain-displacement matrix {B} of the receiver, eva-
+// luated at gp.
+// B matrix  -  6 rows : epsilon-X, epsilon-Y, epsilon-Z, gamma-YZ, gamma-ZX, gamma-XY  :
+{
+    FEInterpolation *interp = this->giveInterpolation();
+    FloatMatrix dNdx, dNdxShear;
+    interp->evaldNdx( dNdx, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this) );
+    if ( this->reducedShearIntegration ) {
+        interp->evaldNdx( dNdxShear, { 0., 0., 0. }, FEIElementGeometryWrapper(this) );
+    } else {
+        dNdxShear =  dNdx;
+    }
+
+    answer.resize(6, dNdx.giveNumberOfRows() * 3);
+    answer.zero();
+
+    for ( int i = 1; i <= dNdx.giveNumberOfRows(); i++ ) {
+        answer.at(1, 3 * i - 2) = dNdx.at(i, 1);
+        answer.at(2, 3 * i - 1) = dNdx.at(i, 2);
+        answer.at(3, 3 * i - 0) = dNdx.at(i, 3);
+
+        answer.at(5, 3 * i - 2) = answer.at(4, 3 * i - 1) = dNdxShear.at(i, 3);
+        answer.at(6, 3 * i - 2) = answer.at(4, 3 * i - 0) = dNdxShear.at(i, 2);
+        answer.at(6, 3 * i - 1) = answer.at(5, 3 * i - 0) = dNdxShear.at(i, 1);
+    }
+}
+
+
 
 
 void
@@ -151,7 +185,7 @@ LSpace :: NodalAveragingRecoveryMI_computeNodalValue(FloatArray &answer, int nod
 
     int size = 0;
 
-    for ( GaussPoint *gp: *integrationRulesArray [ 0 ] ) {
+    for ( GaussPoint *gp : *integrationRulesArray [ 0 ] ) {
         giveIPValue(val, gp, type, tStep);
         if ( size == 0 ) {
             size = val.giveSize();
@@ -254,9 +288,8 @@ LSpace :: HuertaErrorEstimatorI_setupRefinedElementProblem(RefinedElement *refin
                                                            IntArray &controlNode, IntArray &controlDof,
                                                            HuertaErrorEstimator :: AnalysisMode aMode)
 {
-    FloatArray *corner [ 8 ], midSide [ 12 ], midFace [ 6 ], midNode;
     double x = 0.0, y = 0.0, z = 0.0;
-    int inode, nodes = 8, iside, sides = 12, iface, faces = 6, nd, nd1, nd2;
+    int nodes = 8, sides = 12, faces = 6;
 
     static int sideNode [ 12 ] [ 2 ] = { { 1, 2 }, { 2, 3 }, { 3, 4 }, { 4, 1 }, // bottom
                                          { 5, 6 }, { 6, 7 }, { 7, 8 }, { 8, 5 }, // top
@@ -273,25 +306,26 @@ LSpace :: HuertaErrorEstimatorI_setupRefinedElementProblem(RefinedElement *refin
     static int hexaFaceNode [ 8 ] [ 3 ] = { { 1, 3, 6 }, { 1, 4, 3 }, { 1, 5, 4 }, { 1, 6, 5 },
                                             { 2, 6, 3 }, { 2, 3, 4 }, { 2, 4, 5 }, { 2, 5, 6 } };
 
+    FloatArray corner [ 8 ], midSide [ 12 ], midFace [ 6 ], midNode;
     if ( sMode == HuertaErrorEstimatorInterface :: NodeMode ||
-        ( sMode == HuertaErrorEstimatorInterface :: BCMode && aMode == HuertaErrorEstimator :: HEE_linear ) ) {
-        for ( inode = 0; inode < nodes; inode++ ) {
+         ( sMode == HuertaErrorEstimatorInterface :: BCMode && aMode == HuertaErrorEstimator :: HEE_linear ) ) {
+        for ( int inode = 0; inode < nodes; inode++ ) {
             corner [ inode ] = this->giveNode(inode + 1)->giveCoordinates();
 
-            x += corner [ inode ]->at(1);
-            y += corner [ inode ]->at(2);
-            z += corner [ inode ]->at(3);
+            x += corner [ inode ].at(1);
+            y += corner [ inode ].at(2);
+            z += corner [ inode ].at(3);
         }
 
-        for ( iside = 0; iside < sides; iside++ ) {
+        for ( int iside = 0; iside < sides; iside++ ) {
             midSide [ iside ].resize(3);
 
-            nd1 = sideNode [ iside ] [ 0 ] - 1;
-            nd2 = sideNode [ iside ] [ 1 ] - 1;
+            int nd1 = sideNode [ iside ] [ 0 ] - 1;
+            int nd2 = sideNode [ iside ] [ 1 ] - 1;
 
-            midSide [ iside ].at(1) = ( corner [ nd1 ]->at(1) + corner [ nd2 ]->at(1) ) / 2.0;
-            midSide [ iside ].at(2) = ( corner [ nd1 ]->at(2) + corner [ nd2 ]->at(2) ) / 2.0;
-            midSide [ iside ].at(3) = ( corner [ nd1 ]->at(3) + corner [ nd2 ]->at(3) ) / 2.0;
+            midSide [ iside ].at(1) = ( corner [ nd1 ].at(1) + corner [ nd2 ].at(1) ) / 2.0;
+            midSide [ iside ].at(2) = ( corner [ nd1 ].at(2) + corner [ nd2 ].at(2) ) / 2.0;
+            midSide [ iside ].at(3) = ( corner [ nd1 ].at(3) + corner [ nd2 ].at(3) ) / 2.0;
         }
 
         midNode.resize(3);
@@ -300,13 +334,13 @@ LSpace :: HuertaErrorEstimatorI_setupRefinedElementProblem(RefinedElement *refin
         midNode.at(2) = y / nodes;
         midNode.at(3) = z / nodes;
 
-        for ( iface = 0; iface < faces; iface++ ) {
+        for ( int iface = 0; iface < faces; iface++ ) {
             x = y = z = 0.0;
-            for ( inode = 0; inode < 4; inode++ ) {
-                nd = faceNode [ iface ] [ inode ] - 1;
-                x += corner [ nd ]->at(1);
-                y += corner [ nd ]->at(2);
-                z += corner [ nd ]->at(3);
+            for ( int inode = 0; inode < 4; inode++ ) {
+                int nd = faceNode [ iface ] [ inode ] - 1;
+                x += corner [ nd ].at(1);
+                y += corner [ nd ].at(2);
+                z += corner [ nd ].at(3);
             }
 
             midFace [ iface ].resize(3);
@@ -575,7 +609,7 @@ LSpace :: drawSpecial(oofegGraphicContext &gc, TimeStep *tStep)
         double length;
         FloatArray crackDir;
 
-        for ( GaussPoint *gp: *this->giveDefaultIntegrationRulePtr() ) {
+        for ( GaussPoint *gp : *this->giveDefaultIntegrationRulePtr() ) {
             if ( this->giveIPValue(cf, gp, IST_CrackedFlag, tStep) == 0 ) {
                 return;
             }
@@ -587,7 +621,7 @@ LSpace :: drawSpecial(oofegGraphicContext &gc, TimeStep *tStep)
             //
             // obtain gp global coordinates
             this->computeGlobalCoordinates( gpc, gp->giveNaturalCoordinates() );
-            length = 0.3333 * cbrt(this->computeVolumeAround(gp));
+            length = 0.3333 * cbrt( this->computeVolumeAround(gp) );
             if ( this->giveIPValue(crackDir, gp, IST_CrackDirs, tStep) ) {
                 this->giveIPValue(crackStatuses, gp, IST_CrackStatuses, tStep);
 
@@ -665,27 +699,25 @@ LSpace :: computeLoadLSToLRotationMatrix(FloatMatrix &answer, int isurf, GaussPo
      */
     FloatArray gc(3);
     FloatArray h1(3), h2(3), nn(3), n(3);
-    IntArray snodes(4);
 
     answer.resize(3, 3);
 
-    this->interpolation.computeSurfaceMapping(snodes, dofManArray, isurf);
+    const auto &snodes = this->interpolation.computeSurfaceMapping(dofManArray, isurf);
     for ( int i = 1; i <= 4; i++ ) {
-        gc.add( * domain->giveNode( snodes.at(i) )->giveCoordinates() );
+        gc.add( domain->giveNode( snodes.at(i) )->giveCoordinates() );
     }
 
     gc.times(1. / 4.);
     // determine "average normal"
     for ( int i = 1; i <= 4; i++ ) {
         int j = ( i ) % 4 + 1;
-        h1 = * domain->giveNode( snodes.at(i) )->giveCoordinates();
+        h1 = domain->giveNode( snodes.at(i) )->giveCoordinates();
         h1.subtract(gc);
-        h2 = * domain->giveNode( snodes.at(j) )->giveCoordinates();
+        h1.normalize();
+        h2 = domain->giveNode( snodes.at(j) )->giveCoordinates();
         h2.subtract(gc);
+        h2.normalize();	
         n.beVectorProductOf(h1, h2);
-        if ( n.computeSquaredNorm() > 1.e-6 ) {
-            n.normalize();
-        }
 
         nn.add(n);
     }

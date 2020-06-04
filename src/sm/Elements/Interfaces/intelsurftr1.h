@@ -37,6 +37,8 @@
 
 #include "sm/Elements/Interfaces/structuralinterfaceelement.h"
 #include "fei3dtrlin.h"
+#include "floatarrayf.h"
+#include "floatmatrixf.h"
 
 #define _IFT_IntElSurfTr1_Name "intelsurftr1"
 
@@ -51,7 +53,6 @@ protected:
 
 public:
     IntElSurfTr1(int n, Domain *d);
-    virtual ~IntElSurfTr1() { }
 
     int computeGlobalCoordinates(FloatArray &answer, const FloatArray &lcoords) override;
     bool computeLocalCoordinates(FloatArray &answer, const FloatArray &gcoords) override;
@@ -66,17 +67,17 @@ public:
 
     void giveEngTraction(FloatArray &answer, GaussPoint *gp, const FloatArray &jump, TimeStep *tStep) override
     {
-        this->giveInterfaceCrossSection()->giveEngTraction_3d(answer, gp, jump, tStep);
+        answer = this->giveInterfaceCrossSection()->giveEngTraction_3d(jump, gp, tStep);
     }
 
     void giveStiffnessMatrix_Eng(FloatMatrix &answer, MatResponseMode rMode, IntegrationPoint *ip, TimeStep *tStep) override
     {
-        this->giveInterfaceCrossSection()->give3dStiffnessMatrix_Eng(answer, rMode, ip, tStep);
+        answer = this->giveInterfaceCrossSection()->give3dStiffnessMatrix_Eng(rMode, ip, tStep);
     }
 
     // definition & identification
     const char *giveInputRecordName() const override { return _IFT_IntElSurfTr1_Name; }
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
     Element_Geometry_Type giveGeometryType() const override { return EGT_wedge_1; }
 
 #ifdef __OOFEG

@@ -48,102 +48,70 @@ REGISTER_Material(IntMatBilinearCZElastic);
 IntMatBilinearCZElastic :: IntMatBilinearCZElastic(int n, Domain *d) : StructuralInterfaceMaterial(n, d) { }
 
 
-IntMatBilinearCZElastic :: ~IntMatBilinearCZElastic() { }
-
-
-void
-IntMatBilinearCZElastic :: giveFirstPKTraction_3d(FloatArray &answer, GaussPoint *gp, const FloatArray &jumpVector,
-                                                  const FloatMatrix &F, TimeStep *tStep)
+FloatArrayF<3>
+IntMatBilinearCZElastic :: giveFirstPKTraction_3d(const FloatArrayF<3> &jump, const FloatMatrixF<3,3> &F, GaussPoint *gp, TimeStep *tStep) const 
 {
     IntMatBilinearCZElasticStatus *status = static_cast< IntMatBilinearCZElasticStatus * >( this->giveStatus(gp) );
 
-    answer.resize( jumpVector.giveSize() );
-    answer.zero();
     /// @todo only study normal stress for now 
     // no degradation in shear
     // jumpVector = [normal shear1 shear2]
-    double gn  = jumpVector.at(1);
-    double gs1 = jumpVector.at(2);
-    double gs2 = jumpVector.at(3);
+    //auto [gn, gs1, gs2] = jump;
+    double gn  = jump.at(1);
+    double gs1 = jump.at(2);
+    double gs2 = jump.at(3);
 
+    double normal;
     if ( gn <= 0.0 ) { // compresssion
-        answer.at(1) = this->knc * gn;
-        answer.at(2) = this->ks0 * gs1;
-        answer.at(3) = this->ks0 * gs2;
+        normal = this->knc * gn;
     } else if ( gn <= this->gn0 ) { // first linear part
-        answer.at(1) = this->kn0 * gn;
-        answer.at(2) = this->ks0 * gs1;
-        answer.at(3) = this->ks0 * gs2;
+        normal = this->kn0 * gn;
     } else if ( gn <= this->gnmax  ) {  // softening branch
-        answer.at(1) = this->sigfn + this->kn1 * ( gn - this->gn0 );
-        answer.at(2) = this->ks0 * gs1;
-        answer.at(3) = this->ks0 * gs2;
+        normal = this->sigfn + this->kn1 * ( gn - this->gn0 );
         //printf("Softening branch...\n");
     } else {
-        answer.at(1) = 0.0; // failed
-        answer.at(2) = this->ks0 * gs1;
-        answer.at(3) = this->ks0 * gs2;
+        normal = 0.0; // failed
         //printf("Failed...\n");
     }
+    FloatArrayF<3> answer = {normal, this->ks0 * gs1, this->ks0 * gs2};
 
     // update gp
-    status->letTempJumpBe(jumpVector);
+    status->letTempJumpBe(jump);
     status->letTempFirstPKTractionBe(answer);
     status->letTempTractionBe(answer);
+    return answer;
 }
 
 
-void
-IntMatBilinearCZElastic :: give3dStiffnessMatrix_dTdj(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep)
+FloatMatrixF<3,3>
+IntMatBilinearCZElastic :: give3dStiffnessMatrix_dTdj(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const
 {
     IntMatBilinearCZElasticStatus *status = static_cast< IntMatBilinearCZElasticStatus * >( this->giveStatus(gp) );
 
-    const FloatArray &jumpVector = status->giveTempJump();
+    const auto &jumpVector = status->giveTempJump();
     double gn = jumpVector.at(1);
 
-    answer.resize(3, 3);
-    answer.zero();
+    double normal;
     if ( gn <= 0.0 ) { // compresssion
-        answer.at(1, 1) = this->knc;
-        answer.at(2, 2) = this->ks0;
-        answer.at(3, 3) = this->ks0;
+        normal = this->knc;
     } else if ( gn <= this->gn0 ) { // first linear part
-	answer.at(1, 1) = this->kn0;        
-	answer.at(2, 2) = this->ks0;
-        answer.at(3, 3) = this->ks0;
+        normal = this->kn0;
         //printf("Linear branch...\n");
     } else if ( gn <= this->gnmax  ) { // softening branch
-	answer.at(1, 1) = this->kn1;        
-	answer.at(2, 2) = this->ks0; // no degradation in shear
-        answer.at(3, 3) = this->ks0;
+        normal = this->kn1;
         //printf("Softening branch...\n");
     } else {
-	answer.at(1, 1) = 0.0; // failed        
-	answer.at(2, 2) = this->ks0;
-        answer.at(3, 3) = this->ks0;
+        normal = 0.0; // failed
         //printf("Failed...\n");
     }
+    return diag<3>({normal, this->ks0, this->ks0});
 }
 
-
-int
-IntMatBilinearCZElastic :: giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep)
-{
-    if ( type == IST_DamageScalar ) {
-        answer.resize(1);
-        answer.at(1) = 0.0; // no damage
-        return 1;
-    } else {
-        return StructuralInterfaceMaterial :: giveIPValue(answer, gp, type, tStep);
-    }
-}
 
 const double tolerance = 1.0e-12; // small number
-IRResultType
-IntMatBilinearCZElastic :: initializeFrom(InputRecord *ir)
+void
+IntMatBilinearCZElastic :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;                    // Required by IR_GIVE_FIELD macro
-
     IR_GIVE_FIELD(ir, kn0, _IFT_IntMatBilinearCZElastic_kn);
     this->knc = kn0;                        // Defaults to the same stiffness in compression and tension
     IR_GIVE_OPTIONAL_FIELD(ir, this->knc, _IFT_IntMatBilinearCZElastic_knc);
@@ -162,25 +130,19 @@ IntMatBilinearCZElastic :: initializeFrom(InputRecord *ir)
     this->gnmax = 2.0 * GIc / sigfn;                         // @todo defaults to zero - will this cause problems?
     this->kn1 = -this->sigfn / ( this->gnmax - this->gn0 );  // slope during softening part in normal dir
 
-    result = StructuralInterfaceMaterial :: initializeFrom(ir);
-    if ( result != IRRT_OK ) return result;
+    StructuralInterfaceMaterial :: initializeFrom(ir);
 
     // check validity of the material paramters
     double kn0min = 0.5 * this->sigfn * this->sigfn / this->GIc;
     if ( this->kn0 < 0.0 ) {
-        OOFEM_WARNING("stiffness kn0 is negative (%.2e)", this->kn0);
-        return IRRT_BAD_FORMAT;
+        throw ValueInputException(ir, _IFT_IntMatBilinearCZElastic_kn, "stiffness kn0 is negative");
     } else if ( this->ks0 < 0.0 ) {
-        OOFEM_WARNING("stiffness ks0 is negative (%.2e)", this->ks0);
-        return IRRT_BAD_FORMAT;
+        throw ValueInputException(ir, _IFT_IntMatBilinearCZElastic_ks, "stiffness ks0 is negative");
     } else if ( this->GIc < 0.0 ) {
-        OOFEM_WARNING("GIc is negative (%.2e)", this->GIc);
-        return IRRT_BAD_FORMAT;
+        throw ValueInputException(ir, _IFT_IntMatBilinearCZElastic_g1c, "GIc is negative");
     } else if ( this->kn0 < kn0min  ) { // => gn0 > gnmax
-        //OOFEM_WARNING("kn0 (%.2e) is below minimum stiffness (%.2e), => gn0 > gnmax, which is unphysical", this->kn0, kn0min);
-        //return IRRT_BAD_FORMAT;
+        //throw ValueInputException(ir, _IFT_IntMatBilinearCZElastic_kn, "kn0 is below minimum stiffness, which is unphysical");
     }
-    return IRRT_OK;
 }
 
 void IntMatBilinearCZElastic :: giveInputRecord(DynamicInputRecord &input)

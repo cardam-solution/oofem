@@ -75,22 +75,21 @@ class FRCFCMStatus : public ConcreteFCMStatus
 {
 protected:
     /// Damage level of material.
-    double damage;
+    double damage = 0.;
     /// Non-equilibrated damage level of material.
-    double tempDamage;
+    double tempDamage = 0.;
 
 public:
-    FRCFCMStatus(int n, Domain *d, GaussPoint *g);
-    virtual ~FRCFCMStatus();
+    FRCFCMStatus(GaussPoint *g);
 
     /// Returns the last equilibrated damage level.
-    double giveDamage() { return damage; }
+    double giveDamage() const { return damage; }
     /// Returns the temporary damage level.
-    double giveTempDamage() { return tempDamage; }
+    double giveTempDamage() const { return tempDamage; }
     /// Sets the temp damage level to given value.
     void setTempDamage(double newDamage) { tempDamage = newDamage; }
 
-    void printOutputAt(FILE *file, TimeStep *tStep) override;
+    void printOutputAt(FILE *file, TimeStep *tStep) const override;
 
     const char *giveClassName() const override { return "FRCFCMStatus"; }
 
@@ -106,64 +105,63 @@ public:
  * This class implements a FRCFCM material (Fiber Reinforced Concrete base on Fixed Crack Model)
  * in a finite element problem. This class provides an extension to the ConcreteFCM which
  * serves as a material model for matrix while the present class FRCFCM adds the contribution
- * of fibers
+ * of fibers. The contribution of the two constituents are defined by Vf parameter = volume of fibers.
  */
 class FRCFCM : public ConcreteFCM
 {
 public:
     FRCFCM(int n, Domain *d);
-    virtual ~FRCFCM() {}
 
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
 
-    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new FRCFCMStatus(1, domain, gp); }
+    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new FRCFCMStatus(gp); }
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
 
 protected:
     /// fiber shear strength at zero slip
-    double tau_0;
+    double tau_0 = 0.;
 
     /// micromechanical parameter for fiber shear according to Sajdlova
-    double b0;
+    double b0 = 0.;
     /// micromechanical parameter for fiber shear according to Kabele
-    double b1, b2, b3;
+    double b1 = 0., b2 = 0., b3 = 0.;
 
     /// snubbing factor "f"
-    double f;
+    double f = 0.;
 
     /// auxiliary parameter computed from snubbing factor "f"
-    double g;
+    double g = 0.;
 
     /// volume fraction of fibers
-    double Vf;
+    double Vf = 0.;
 
     /// fiber length
-    double Lf;
+    double Lf = 0.;
 
     /// fiber diameter
-    double Df;
+    double Df = 0.;
 
     /// fiber Young's modulus
-    double Ef;
+    double Ef = 0.;
 
     /// fiber shear modulus
-    double Gfib;
+    double Gfib = 0.;
 
     /// fiber cross-sectional shear factor
-    double kfib;
+    double kfib = 0.;
 
     /// transitional opening
-    double w_star;
+    double w_star = 0.;
 
     /// aux. factor
-    double eta;
+    double eta = 0.;
 
     /// shear strain at full fibers rupture
-    double gammaCrackFail;
+    double gammaCrackFail = 0.;
 
     /// minimum opening at which damage can start
-    double minDamageOpening;
+    double minDamageOpening = 0.;
 
     /**
      * Exponent in the unloading-reloading constitutive law.
@@ -171,13 +169,13 @@ protected:
      * and the stress at maximum cracking strain
      * sigma(w) = sig_max * w^M / w_max^M
      */
-    int M;
+    int M = 0;
 
     /// orientation of fibres
     FloatArray orientationVector;
 
     /// crack opening at which the crossing fibers begin to be activated
-    double fibreActivationOpening;
+    double fibreActivationOpening = 0.;
 
     /**
      * smooth transition of the bridging stress if fibreActivationOpening is applied
@@ -185,51 +183,52 @@ protected:
      * dw1 = distance from the fibreActivationOpening where the smooth transition ends
      * smoothen = flag
      */
-    double dw0, dw1;
-    bool smoothen;
+    double dw0 = 0., dw1 = 0.;
+    bool smoothen = false;
 
     /**
      * Type strength of the shear bond. This is activated only for short fibers (SAF or SRF)
      * once the maximum crack opening exceeds w*
      */
     enum FiberShearStrengthType { FSS_NONE, FSS_Sajdlova, FSS_Kabele, FSS_Havlasek, FSS_Unknown };
-    FiberShearStrengthType fiberShearStrengthType;
+    FiberShearStrengthType fiberShearStrengthType = FSS_Unknown;
 
     /// Type of fibre damage which is triggered by crack shearing strain = w / u
     enum FiberDamageType { FDAM_NONE, FDAM_GammaCrackLin, FDAM_GammaCrackExp, FDAM_Unknown };
-    FiberDamageType fiberDamageType;
+    FiberDamageType fiberDamageType = FDAM_Unknown;
 
     /**
      * Type fo fibers in the composite.
      * CAF = continuous aligned fibers
      * SAF = short aligned fibers
      * SRF = short random fibers
+     * SRF2D = short fibers random in 2D
      */
-    enum FiberType { FT_CAF, FT_SAF, FT_SRF, FT_Unknown };
-    FiberType fiberType;
+    enum FiberType { FT_CAF, FT_SAF, FT_SRF, FT_SRF2D, FT_Unknown };
+    FiberType fiberType = FT_Unknown;
 
-    double giveCrackingModulus(MatResponseMode rMode, GaussPoint *gp, int i) override;
+    double giveCrackingModulus(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep, int i) override;
     /// evaluates the fiber bond if w > w*
     virtual double computeFiberBond(double w);
-    double giveNormalCrackingStress(GaussPoint *gp, double eps_cr, int i) override;
+    double giveNormalCrackingStress(GaussPoint *gp, TimeStep *tStep, double eps_cr, int i) override;
     /// compute the nominal stress in fibers in the i-th crack
-    virtual double computeStressInFibersInCracked(GaussPoint *gp, double eps_cr, int i);
-    double computeEffectiveShearModulus(GaussPoint *gp, int i) override;
-    double computeD2ModulusForCrack(GaussPoint *gp, int icrack) override;
+    virtual double computeStressInFibersInCracked(GaussPoint *gp, TimeStep *tStep, double eps_cr, int i);
+    double computeEffectiveShearModulus(GaussPoint *gp, TimeStep *tStep, int i) override;
+    double computeD2ModulusForCrack(GaussPoint *gp, TimeStep *tStep, int icrack) override;
     /// estimate shear modulus for a given crack plane (1, 2, 3). Uses equilibrated value of damage.
-    virtual double estimateD2ModulusForCrack(GaussPoint *gp, int icrack);
-    double maxShearStress(GaussPoint *gp, int i) override;
+    virtual double estimateD2ModulusForCrack(GaussPoint *gp, TimeStep *tStep, int icrack);
+    double maxShearStress(GaussPoint *gp, TimeStep *tStep, int i) override;
     /// evaluates temporary value of damage caused by fibre shearing
-    virtual double computeTempDamage(GaussPoint *gp);
+    virtual double computeTempDamage(GaussPoint *gp, TimeStep *tStep);
     /// computes crack spacing based on composition of the fibre composite
     virtual double computeCrackSpacing();
     /// compute the angle between the fibre and i-th crack normal
     virtual double computeCrackFibreAngle(GaussPoint *gp, int i);
-    void checkSnapBack(GaussPoint *gp, int crack) override { }
+    void checkSnapBack(GaussPoint *gp, TimeStep *tStep, int crack) override { }
     bool isStrengthExceeded(const FloatMatrix &base, GaussPoint *gp, TimeStep *tStep, int iCrack, double trialStress) override;
-    double computeShearStiffnessRedistributionFactor(GaussPoint *gp, int ithCrackPlane, int jthCrackDirection) override;
-    double computeOverallElasticStiffness() override;
-    double computeOverallElasticShearModulus(void) override { return this->computeOverallElasticStiffness() / ( 2. * ( 1. + linearElasticMaterial.givePoissonsRatio() ) ); }
+    double computeShearStiffnessRedistributionFactor(GaussPoint *gp, TimeStep *tStep, int ithCrackPlane, int jthCrackDirection) override;
+    double computeOverallElasticStiffness(GaussPoint *gp, TimeStep *tStep) override;
+    double computeOverallElasticShearModulus(GaussPoint *gp, TimeStep *tStep) override { return this->computeOverallElasticStiffness(gp, tStep) / ( 2. * ( 1. + linearElasticMaterial.givePoissonsRatio() ) ); }
 };
 } // end namespace oofem
 #endif // frcfcm_h

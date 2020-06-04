@@ -47,38 +47,33 @@ REGISTER_Material(IntMatElastic);
 
 IntMatElastic :: IntMatElastic(int n, Domain *d) : StructuralInterfaceMaterial(n, d) { }
 
-IntMatElastic :: ~IntMatElastic() { }
 
-
-void
-IntMatElastic :: giveFirstPKTraction_3d(FloatArray &answer, GaussPoint *gp, const FloatArray &jumpVector,
-                                                  const FloatMatrix &F, TimeStep *tStep)
+FloatArrayF<3>
+IntMatElastic :: giveFirstPKTraction_3d(const FloatArrayF<3> &jump, const FloatMatrixF<3,3> &F, GaussPoint *gp, TimeStep *tStep) const
 {
     StructuralInterfaceMaterialStatus *status = static_cast< StructuralInterfaceMaterialStatus * >( this->giveStatus(gp) );
 
-    answer.beScaled(k, jumpVector);
+    auto answer = k * jump;
 
-    status->letTempJumpBe(jumpVector);
+    status->letTempJumpBe(jump);
     status->letTempFirstPKTractionBe(answer);
     status->letTempTractionBe(answer);
+    
+    return answer;
+}
+
+FloatMatrixF<3,3>
+IntMatElastic :: give3dStiffnessMatrix_dTdj(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const
+{
+    return eye<3>() * k;
 }
 
 void
-IntMatElastic :: give3dStiffnessMatrix_dTdj(FloatMatrix &answer, MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep)
+IntMatElastic :: initializeFrom(InputRecord &ir)
 {
-    answer.resize(3, 3);
-    answer.beUnitMatrix();
-    answer.times(k);
-}
-
-IRResultType
-IntMatElastic :: initializeFrom(InputRecord *ir)
-{
-    IRResultType result;                    // Required by IR_GIVE_FIELD macro
+    StructuralInterfaceMaterial :: initializeFrom(ir);
 
     IR_GIVE_FIELD(ir, k, _IFT_IntMatElastic_kn);
-
-    return StructuralInterfaceMaterial :: initializeFrom(ir);
 }
 
 void IntMatElastic :: giveInputRecord(DynamicInputRecord &input)

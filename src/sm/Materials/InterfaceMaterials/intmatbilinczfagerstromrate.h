@@ -75,28 +75,20 @@ class IntMatBilinearCZFagerstromRate : public IntMatBilinearCZFagerstrom
 {
 protected:
     /// Rate dependence coefficient
-    double c_star;
+    double c_star = 0.;
     /// Rate dependence exponent
-    double m;
+    double m = 0.;
     int checkConsistency() override;
 
 public:
     /// Constructor
     IntMatBilinearCZFagerstromRate(int n, Domain *d);
-    /// Destructor
-    virtual ~IntMatBilinearCZFagerstromRate();
 
-    void giveFirstPKTraction_3d(FloatArray &answer, GaussPoint *gp, const FloatArray &jump,
-                                 const FloatMatrix &F, TimeStep *tStep) override;
-    IRResultType initializeFrom(InputRecord *ir) override;
+    FloatArrayF<3> giveFirstPKTraction_3d(const FloatArrayF<3> &jump, const FloatMatrixF<3,3> &F, GaussPoint *gp, TimeStep *tStep) const override;
+    void initializeFrom(InputRecord &ir) override;
     void giveInputRecord(DynamicInputRecord &input) override;
     void printYourself() override;
-
-    /**
-     * Tells if the model has implemented analytical tangent stiffness.
-     * If not, the tangent must be computed numerically.
-     */
-    bool hasAnalyticalTangentStiffness() const override {return true;}
+    bool hasAnalyticalTangentStiffness() const override { return true; }
 };
 } // end namespace oofem
 #endif // isointerfacedamage01_h

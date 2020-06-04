@@ -43,6 +43,7 @@
 #include "feinterpol.h"
 #include "sm/CrossSections/structuralinterfacecrosssection.h"
 #include "classfactory.h"
+#include "floatmatrixf.h"
 
 #ifdef __OOFEG
  #include "oofeggraphiccontext.h"
@@ -87,9 +88,9 @@ InterfaceElem1d :: computeStressVector(FloatArray &answer, const FloatArray &str
 {
     setCoordMode();
     switch ( mode ) {
-    case ie1d_1d: static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->giveEngTraction_1d(answer, gp, strain, tStep); return;
-    case ie1d_2d: static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->giveEngTraction_2d(answer, gp, strain, tStep); return;
-    case ie1d_3d: static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->giveEngTraction_3d(answer, gp, strain, tStep); return;
+        case ie1d_1d: answer = FloatArray{static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->giveEngTraction_1d(strain.at(1), gp, tStep)}; return;
+        case ie1d_2d: answer = static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->giveEngTraction_2d(strain, gp, tStep); return;
+        case ie1d_3d: answer = static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->giveEngTraction_3d(strain, gp, tStep); return;
     }
 }
 
@@ -99,9 +100,9 @@ InterfaceElem1d :: computeConstitutiveMatrixAt(FloatMatrix &answer, MatResponseM
 {
     setCoordMode();
     switch ( mode ) {
-    case ie1d_1d: static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->give1dStiffnessMatrix_Eng(answer, rMode, gp, tStep); return;
-    case ie1d_2d: static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->give2dStiffnessMatrix_Eng(answer, rMode, gp, tStep); return;
-    case ie1d_3d: static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->give3dStiffnessMatrix_Eng(answer, rMode, gp, tStep); return;
+    case ie1d_1d: answer = static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->give1dStiffnessMatrix_Eng(rMode, gp, tStep); return;
+    case ie1d_2d: answer = static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->give2dStiffnessMatrix_Eng(rMode, gp, tStep); return;
+    case ie1d_3d: answer = static_cast< StructuralInterfaceCrossSection* >(this->giveCrossSection())->give3dStiffnessMatrix_Eng(rMode, gp, tStep); return;
     }
 }
 
@@ -250,7 +251,7 @@ InterfaceElem1d :: computeGaussPoints()
 int
 InterfaceElem1d :: computeGlobalCoordinates(FloatArray &answer, const FloatArray &lcoords)
 {
-    answer = *this->giveNode(1)->giveCoordinates();
+    answer = this->giveNode(1)->giveCoordinates();
 
     return 1;
 }
@@ -272,22 +273,17 @@ InterfaceElem1d :: computeVolumeAround(GaussPoint *gp)
 }
 
 
-IRResultType
-InterfaceElem1d :: initializeFrom(InputRecord *ir)
+void
+InterfaceElem1d :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;                // Required by IR_GIVE_FIELD macro
-
-    result = StructuralElement :: initializeFrom(ir);
-    if ( result != IRRT_OK ) {
-        return result;
-    }
+    StructuralElement :: initializeFrom(ir);
 
     IR_GIVE_OPTIONAL_FIELD(ir, referenceNode, _IFT_InterfaceElem1d_refnode);
     IR_GIVE_OPTIONAL_FIELD(ir, normal, _IFT_InterfaceElem1d_normal);
     if ( referenceNode == 0 && normal.at(1) == 0 && normal.at(2) == 0 && normal.at(1) == 0 && normal.at(3) == 0 ) {
         OOFEM_ERROR("wrong reference node or normal specified");
     }
-    if ( ir->hasField(_IFT_InterfaceElem1d_dofIDs) ) {
+    if ( ir.hasField(_IFT_InterfaceElem1d_dofIDs) ) {
         IR_GIVE_FIELD(ir, dofids, _IFT_InterfaceElem1d_refnode);
     } else {
         switch ( domain->giveNumberOfSpatialDimensions() ) {
@@ -306,7 +302,6 @@ InterfaceElem1d :: initializeFrom(InputRecord *ir)
     }
 
     this->computeLocalSlipDir(normal); ///@todo Move into postInitialize ?
-    return IRRT_OK;
 }
 
 

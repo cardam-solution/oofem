@@ -44,8 +44,8 @@ namespace oofem {
 KelvinChainMaterial :: KelvinChainMaterial(int n, Domain *d) : RheoChainMaterial(n, d)
 { }
 
-void
-KelvinChainMaterial :: computeCharCoefficients(FloatArray &answer, double tPrime, GaussPoint *gp, TimeStep *tStep )
+FloatArray
+KelvinChainMaterial :: computeCharCoefficients(double tPrime, GaussPoint *gp, TimeStep *tStep) const
 {
     /*
      * This function computes the moduli of individual Kelvin units
@@ -101,16 +101,18 @@ KelvinChainMaterial :: computeCharCoefficients(FloatArray &answer, double tPrime
     }
 
     // solve the linear system
+    FloatArray answer;
     A.solveForRhs(rhs, answer);
 
     // convert compliances into moduli
     for ( int i = 1; i <= this->nUnits; i++ ) {
         answer.at(i) = 1. / answer.at(i);
     }
+    return answer;
 }
 
 double
-KelvinChainMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep)
+KelvinChainMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep) const
 {
     /*
      * This function returns the incremental modulus for the given time increment.
@@ -122,12 +124,13 @@ KelvinChainMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep)
 
     double sum = 0.0; // return value
 
-    if (  (tStep->giveIntrinsicTime() < this->castingTime)  ) {
+    // the viscoelastic material does not exist yet
+    if  ( ! Material :: isActivated( tStep ) ) {
       OOFEM_ERROR("Attempted to evaluate E modulus at time lower than casting time");
     }
 
     ///@warning THREAD UNSAFE!
-    double tPrime = relMatAge + ( tStep->giveTargetTime() - 0.5 * tStep->giveTimeIncrement() );
+    double tPrime = this->relMatAge - this->castingTime + ( tStep->giveTargetTime() - 0.5 * tStep->giveTimeIncrement() );
     this->updateEparModuli(tPrime, gp, tStep);
 
     double deltaT = tStep->giveTimeIncrement();
@@ -155,17 +158,17 @@ KelvinChainMaterial :: giveEModulus(GaussPoint *gp, TimeStep *tStep)
 }
 
 void
-KelvinChainMaterial :: giveEigenStrainVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep, ValueModeType mode)
+KelvinChainMaterial :: giveEigenStrainVector(FloatArray &answer, GaussPoint *gp, TimeStep *tStep, ValueModeType mode) const
 //
 // computes the strain due to creep at constant stress during the increment
 // (in fact, the INCREMENT of creep strain is computed for mode == VM_Incremental)
 //
 {
-    KelvinChainMaterialStatus *status = static_cast< KelvinChainMaterialStatus * >( this->giveStatus(gp) );
+    auto status = static_cast< KelvinChainMaterialStatus * >( this->giveStatus(gp) );
 
     // !!! chartime exponents are assumed to be equal to 1 !!!
 
-    if (  tStep->giveIntrinsicTime() < this->castingTime  ) {
+    if ( ! Material :: isActivated( tStep ) ) {
         OOFEM_ERROR("Attempted to evaluate creep strain for time lower than casting time");
     }
 
@@ -211,11 +214,11 @@ KelvinChainMaterial :: computeHiddenVars(GaussPoint *gp, TimeStep *tStep)
 
     // !!! chartime exponents are assumed to be equal to 1 !!!
 
-    FloatArray help, deltaEps0, delta_sigma;
+    FloatArray help, delta_sigma;
     KelvinChainMaterialStatus *status = static_cast< KelvinChainMaterialStatus * >( this->giveStatus(gp) );
 
-    //   if ( !this->isActivated(tStep) ) {
-    if (  tStep->giveIntrinsicTime() < this->castingTime ) {
+    // goes there if the viscoelastic material does not exist yet
+    if (  ! Material :: isActivated( tStep ) )  {
         help.resize(StructuralMaterial :: giveSizeOfVoigtSymVector( gp->giveMaterialMode() ) );
         help.zero();
         for ( int mu = 1; mu <= nUnits; mu++ ) {
@@ -228,7 +231,7 @@ KelvinChainMaterial :: computeHiddenVars(GaussPoint *gp, TimeStep *tStep)
     delta_sigma.subtract( status->giveStrainVector() ); // strain increment in current time-step
 
     // Subtract the stress-independent part of strain
-    this->computeStressIndependentStrainVector(deltaEps0, gp, tStep, VM_Incremental);
+    auto deltaEps0 = this->computeStressIndependentStrainVector(gp, tStep, VM_Incremental);
     if ( deltaEps0.giveSize() ) {
         delta_sigma.subtract(deltaEps0); // should be equal to zero if there is no stress change during the time-step
     }
@@ -272,27 +275,23 @@ KelvinChainMaterial :: computeHiddenVars(GaussPoint *gp, TimeStep *tStep)
 MaterialStatus *
 KelvinChainMaterial :: CreateStatus(GaussPoint *gp) const
 {
-    return new KelvinChainMaterialStatus(1, this->giveDomain(), gp, nUnits);
+    return new KelvinChainMaterialStatus(gp, nUnits);
 }
 
-IRResultType
-KelvinChainMaterial :: initializeFrom(InputRecord *ir)
+void
+KelvinChainMaterial :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result = RheoChainMaterial :: initializeFrom(ir);
-    if ( result != IRRT_OK ) return result;
-
+    RheoChainMaterial :: initializeFrom(ir);
     this->giveDiscreteTimes(); // Makes sure the new discrete times are evaluated.
-    return IRRT_OK;
 }
 
 /****************************************************************************************/
 
-KelvinChainMaterialStatus :: KelvinChainMaterialStatus(int n, Domain *d,
-                                                       GaussPoint *g, int nunits) :
-    RheoChainMaterialStatus(n, d, g, nunits) { }
+KelvinChainMaterialStatus :: KelvinChainMaterialStatus(GaussPoint *g, int nunits) :
+    RheoChainMaterialStatus(g, nunits) { }
 
 void
-KelvinChainMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep)
+KelvinChainMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep) const
 {
     RheoChainMaterialStatus :: printOutputAt(file, tStep);
 }

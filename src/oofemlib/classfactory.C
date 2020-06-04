@@ -52,14 +52,13 @@
 #include "mesherinterface.h"
 #include "errorestimator.h"
 #include "materialmappingalgorithm.h"
-#include "loadbalancer.h"
 #include "function.h"
 #include "material.h"
 #include "crosssection.h"
 #include "nonlocalbarrier.h"
 #include "exportmodule.h"
 #include "initmodule.h"
-
+#include "loadbalancer.h"
 
 #include "gaussintegrationrule.h"
 #include "lobattoir.h"
@@ -283,6 +282,16 @@ std::unique_ptr<ExportModule> ClassFactory :: createExportModule(const char *nam
 bool ClassFactory :: registerExportModule( const char *name, std::unique_ptr<ExportModule> ( *creator )( int, EngngModel * ) )
 {
     return cf_store(exportList, name, creator);
+}
+
+std::unique_ptr<Monitor> ClassFactory :: createMonitor(const char *name, int number)
+{
+    return cf_create<Monitor>(monitorList, name, number);
+}
+
+bool ClassFactory :: registerMonitor( const char *name, std::unique_ptr<Monitor> ( *creator )( int ) )
+{
+    return cf_store(monitorList, name, creator);
 }
 
 std::unique_ptr<SparseNonLinearSystemNM>ClassFactory :: createNonLinearSolver(const char *name, Domain *domain, EngngModel *emodel)

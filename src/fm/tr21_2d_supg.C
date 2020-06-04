@@ -65,14 +65,9 @@ FEI2dTrLin TR21_2D_SUPG :: pressureInterpolation(1, 2);
 
 TR21_2D_SUPG :: TR21_2D_SUPG(int n, Domain *aDomain) :
     SUPGElement2(n, aDomain), ZZNodalRecoveryModelInterface(this)
-    // Constructor.
 {
     numberOfDofMans  = 6;
 }
-
-TR21_2D_SUPG :: ~TR21_2D_SUPG()
-// Destructor
-{ }
 
 FEInterpolation *
 TR21_2D_SUPG :: giveInterpolation() const
@@ -133,14 +128,14 @@ TR21_2D_SUPG :: computeGaussPoints()
 void
 TR21_2D_SUPG :: computeDeviatoricStress(FloatArray &answer, const FloatArray &eps, GaussPoint *gp, TimeStep *tStep)
 {
-    static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeDeviatoricStress2D(answer, gp, eps, tStep);
+    answer = static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeDeviatoricStress2D(eps, gp, tStep);
 }
 
 
 void
 TR21_2D_SUPG :: computeTangent(FloatMatrix &answer, MatResponseMode mode, GaussPoint *gp, TimeStep *tStep)
 {
-    static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeTangent2D(answer, mode, gp, tStep);
+    answer = static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeTangent2D(mode, gp, tStep);
 }
 
 
@@ -250,16 +245,14 @@ TR21_2D_SUPG :: computeGradPMatrix(FloatMatrix &answer, GaussPoint *gp)
 void
 TR21_2D_SUPG :: computeDivTauMatrix(FloatMatrix &answer, GaussPoint *gp, TimeStep *tStep)
 {
-    FloatMatrix D, d2n;
-
-    answer.resize(2, 12);
-    answer.zero();
-
+    FloatMatrix d2n;
 
     this->velocityInterpolation.evald2Ndx2( d2n, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this) );
 
-    static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeTangent2D(D, TangentStiffness, integrationRulesArray [ 0 ]->getIntegrationPoint(0), tStep);
+    auto D = static_cast< FluidCrossSection * >( this->giveCrossSection() )->giveFluidMaterial()->computeTangent2D(TangentStiffness, integrationRulesArray [ 0 ]->getIntegrationPoint(0), tStep);
 
+    answer.resize(2, 12);
+    answer.zero();
     for ( int i = 1; i <= 6; i++ ) {
         answer.at(1, 2 * i - 1) = D.at(1, 1) * d2n.at(i, 1) + D.at(1, 3) * d2n.at(i, 3) + D.at(3, 1) * d2n.at(i, 3) + D.at(3, 3) * d2n.at(i, 2);
         answer.at(1, 2 * i)     = D.at(1, 2) * d2n.at(i, 3) + D.at(1, 3) * d2n.at(i, 1) + D.at(3, 2) * d2n.at(i, 2) + D.at(3, 3) * d2n.at(i, 3);
@@ -1070,11 +1063,10 @@ TR21_2D_SUPG :: computeIntersection(int iedge, FloatArray &intcoords, FloatArray
 {
     FloatArray Coeff(3), helplcoords(3);
     double fi1, fi2, fi3, r1, r11, r12;
-    IntArray edge(3);
     intcoords.resize(2);
     intcoords.zero();
 
-    this->velocityInterpolation.computeLocalEdgeMapping(edge, iedge);
+    const auto &edge = this->velocityInterpolation.computeLocalEdgeMapping(iedge);
     fi1 = fi.at( edge.at(1) );
     fi2 = fi.at( edge.at(2) );
     fi3 = fi.at( edge.at(3) );
@@ -1201,9 +1193,7 @@ void
 TR21_2D_SUPG :: computeCoordsOfEdge(FloatArray &answer, int iedge)
 
 {
-    IntArray edge;
-
-    velocityInterpolation.computeLocalEdgeMapping(edge, iedge);
+    const auto &edge = velocityInterpolation.computeLocalEdgeMapping(iedge);
 
     answer.at(1) = this->giveNode( edge.at(1) )->giveCoordinate(1);
     answer.at(2) = this->giveNode( edge.at(1) )->giveCoordinate(2);

@@ -60,25 +60,13 @@ FRCFCMNL :: FRCFCMNL(int n, Domain *d) : FRCFCM(n, d), StructuralNonlocalMateria
 {}
 
 
-IRResultType
-FRCFCMNL :: initializeFrom(InputRecord *ir)
+void
+FRCFCMNL :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;                // Required by IR_GIVE_FIELD macro
-
-    result = FRCFCM :: initializeFrom(ir);
-    if ( result != IRRT_OK ) {
-        return result;
-    }
-
-    result = StructuralNonlocalMaterialExtensionInterface :: initializeFrom(ir);
-    if ( result != IRRT_OK ) {
-        return result;
-    }
-
+    FRCFCM :: initializeFrom(ir);
+    StructuralNonlocalMaterialExtensionInterface :: initializeFrom(ir);
     //    IR_GIVE_FIELD(ir, participAngle, _IFT_FRCFCMNL_participAngle);
     participAngle = 90.;
-
-    return IRRT_OK;
 }
 
 
@@ -125,7 +113,7 @@ FRCFCMNL :: giveRealStressVector(FloatArray &answer, GaussPoint *gp,
 
             if ( crackStrain > 0. ) {
                 // get local fiber stress
-                sigma_f_local = this->computeStressInFibersInCracked(gp, crackStrain, iCrack);
+	      sigma_f_local = this->computeStressInFibersInCracked(gp, tStep, crackStrain, iCrack);
                 // set local fiber stress to status
                 status->setTempFiberStressLoc(iCrack, sigma_f_local);
             } else {
@@ -791,37 +779,30 @@ FRCFCMNL :: giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType ty
 ///////////////////////////////////////////////////////////////////
 
 
-FRCFCMNLStatus :: FRCFCMNLStatus(int n, Domain *d, GaussPoint *gp) :
-    FRCFCMStatus(n, d, gp), StructuralNonlocalMaterialStatusExtensionInterface(),
-    fiberStressLoc(), tempFiberStressLoc(), fiberStressNL(), tempFiberStressNL()
+FRCFCMNLStatus :: FRCFCMNLStatus(GaussPoint *gp) :
+    FRCFCMStatus(gp), StructuralNonlocalMaterialStatusExtensionInterface(),
+    fiberStressLoc(this->nMaxCracks), tempFiberStressLoc(), fiberStressNL(), tempFiberStressNL()
 {
-    fiberStressLoc.resize(this->nMaxCracks);
-    fiberStressLoc.zero();
     tempFiberStressLoc = fiberStressLoc;
     fiberStressNL = fiberStressLoc;
     tempFiberStressNL = fiberStressLoc;
 }
 
 
-FRCFCMNLStatus :: ~FRCFCMNLStatus()
-{}
-
-
-
 void
-FRCFCMNLStatus :: printOutputAt(FILE *file, TimeStep *tStep)
+FRCFCMNLStatus :: printOutputAt(FILE *file, TimeStep *tStep) const
 {
     FRCFCMStatus :: printOutputAt(file, tStep);
 
     fprintf(file, "maxFiberStressLocal: {");
-    for ( int i = 1; i <= this->giveMaxNumberOfCracks(gp); i++ ) {
-        fprintf( file, " %f", this->giveFiberStressLoc(i) );
+    for ( double s: fiberStressLoc ) {
+        fprintf( file, " %f", s );
     }
     fprintf(file, "}\n");
 
     fprintf(file, "maxFiberStressNL: {");
-    for ( int i = 1; i <= this->giveMaxNumberOfCracks(gp); i++ ) {
-        fprintf( file, " %f", this->giveFiberStressNL(i) );
+    for ( double s: fiberStressLoc ) {
+        fprintf( file, " %f", s );
     }
     fprintf(file, "}\n");
 }

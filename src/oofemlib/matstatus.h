@@ -86,15 +86,11 @@ class OOFEM_EXPORT MaterialStatus : public IntegrationPointStatus
 public:
     /**
      * Constructor.
-     * @param n Receiver's number.
-     * @param d Domain to which new status belongs.
      * @param g Associated integration point.
      */
-    MaterialStatus(int n, Domain * d, GaussPoint * g) : IntegrationPointStatus(n, d, g) { }
-    /// Destructor.
-    virtual ~MaterialStatus() { }
+    MaterialStatus(GaussPoint * g) : IntegrationPointStatus(g) { }
     /// Print receiver's output to given stream.
-    void printOutputAt(FILE *file, TimeStep *tStep) override { }
+    void printOutputAt(FILE *file, TimeStep *tStep) const override { }
 
     /**
      * Initializes the temporary internal variables, describing the current state according to

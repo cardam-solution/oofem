@@ -61,19 +61,18 @@ void FE2FluidMaterialStatus :: setTimeStep(TimeStep *tStep)
     rveTStep->setTimeIncrement( tStep->giveTimeIncrement() );
 }
 
-void FE2FluidMaterial :: computeDeviatoricStress3D(FloatArray &answer, GaussPoint *gp, const FloatArray &eps, TimeStep *tStep)
+FloatArrayF<6> FE2FluidMaterial :: computeDeviatoricStress3D(const FloatArrayF<6> &eps, GaussPoint *gp, TimeStep *tStep) const
 {
-    double r_vol;
-    this->computeDeviatoricStress3D(answer, r_vol, gp, eps, 0.0, tStep);
-    r_vol += eps.at(1) + eps.at(2) + eps.at(3);
-
+    auto val = this->computeDeviatoricStress3D(eps, 0.0, gp, tStep);
+    double r_vol = val.second + eps.at(1) + eps.at(2) + eps.at(3);
     if ( r_vol > 1e-9 ) {
         OOFEM_ERROR("RVE seems to be compressible;"
                     " extended macro-formulation which doesn't assume incompressibility is required");
     }
+    return val.first;
 }
 
-void FE2FluidMaterial :: computeDeviatoricStress3D(FloatArray &stress_dev, double &r_vol, GaussPoint *gp, const FloatArray &eps, double pressure, TimeStep *tStep)
+std::pair<FloatArrayF<6>, double> FE2FluidMaterial :: computeDeviatoricStress3D(const FloatArrayF<6> &eps, double pressure, GaussPoint *gp, TimeStep *tStep) const
 {
     FE2FluidMaterialStatus *ms = static_cast< FE2FluidMaterialStatus * >( this->giveStatus(gp) );
 
@@ -87,6 +86,8 @@ void FE2FluidMaterial :: computeDeviatoricStress3D(FloatArray &stress_dev, doubl
     // Solve subscale problem
     ms->giveRVE()->solveYourselfAt(ms->giveRVE()->giveCurrentStep());
 
+    FloatArray stress_dev;
+    double r_vol;
     bc->computeFields(stress_dev, r_vol, tStep);
 
     ms->letDeviatoricStressVectorBe(stress_dev);
@@ -95,156 +96,158 @@ void FE2FluidMaterial :: computeDeviatoricStress3D(FloatArray &stress_dev, doubl
     ms->markOldTangents(); // Mark this so that tangents are reevaluated if they are needed.
     // One could also just compute them here, but you don't actually need them if the problem has converged, so this method saves on that iteration.
     // Computing the tangents are often *more* expensive than computeFields, so this is well worth the time it saves
+    return {stress_dev, r_vol};
 }
 
-void FE2FluidMaterial :: computeTangent3D(FloatMatrix &answer, MatResponseMode mode, GaussPoint *gp, TimeStep *tStep)
+FloatMatrixF<6,6> FE2FluidMaterial :: computeTangent3D(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const
 {
     FE2FluidMaterialStatus *ms = static_cast< FE2FluidMaterialStatus * >( this->giveStatus(gp) );
     ms->computeTangents(tStep);
-    if ( mode == TangentStiffness ) {
-        answer = ms->giveDeviatoricTangent();
-    } else {
+    if ( mode != TangentStiffness ) {
         OOFEM_ERROR("Mode not implemented");
     }
+    FloatMatrixF<6,6> x = ms->giveDeviatoricTangent();
+    return x; //ms->giveDeviatoricTangent();
 }
 
-void FE2FluidMaterial :: computeTangents3D(FloatMatrix &dsdd, FloatArray &dsdp, FloatArray &dedd, double &dedp,
-                                           MatResponseMode mode, GaussPoint *gp, TimeStep *tStep)
+FluidDynamicMaterial::Tangents<6>
+FE2FluidMaterial :: computeTangents3D(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const
 {
+    //FloatMatrix &dsdd, FloatArray &dsdp, FloatArray &dedd, double &dedp,
     FE2FluidMaterialStatus *ms = static_cast< FE2FluidMaterialStatus * >( this->giveStatus(gp) );
     ms->computeTangents(tStep);
-    if ( mode == TangentStiffness ) {
-        dsdd = ms->giveDeviatoricTangent();
-        dsdp = ms->giveDeviatoricPressureTangent();
-        dedd = ms->giveVolumetricDeviatoricTangent();
-        dedp = ms->giveVolumetricPressureTangent();
-#if 0
-        // Numerical ATS for debugging
-        FloatMatrix numericalATS(6, 6);
-        FloatArray dsig;
-        FloatArray tempStrain(6);
-
-        tempStrain.zero();
-        FloatArray sig, strain, sigPert;
-        double epspvol;
-        computeDeviatoricStressVector(sig, epspvol, gp, tempStrain, 0., tStep);
-        double h = 0.001; // Linear problem, size of this doesn't matter.
-        for ( int k = 1; k <= 6; ++k ) {
-            strain = tempStrain;
-            strain.at(k) += h;
-            double tmp = strain.at(1) + strain.at(2) + strain.at(3);
-            strain.at(1) -= tmp/3.0;
-            strain.at(2) -= tmp/3.0;
-            strain.at(3) -= tmp/3.0;
-            strain.printYourself();
-            computeDeviatoricStressVector(sigPert, epspvol, gp, strain, 0., tStep);
-            sigPert.printYourself();
-            dsig.beDifferenceOf(sigPert, sig);
-            numericalATS.setColumn(dsig, k);
-        }
-        numericalATS.times(1. / h);
-
-        printf("Analytical deviatoric tangent = ");
-        dsdd.printYourself();
-        printf("Numerical deviatoric tangent = ");
-        numericalATS.printYourself();
-        numericalATS.subtract(dsdd);
-        double norm = numericalATS.computeFrobeniusNorm();
-        if ( norm > dsdd.computeFrobeniusNorm() * DEBUG_ERR && norm > 0.0 ) {
-            OOFEM_ERROR("Error in deviatoric tangent");
-        }
-#endif
-#if 0
-        // Numerical ATS for debugging
-        FloatArray strain(3);
-        strain.zero();
-        FloatArray sig, sigh;
-        double epspvol, pressure = 0.0;
-        double h = 1.00; // Linear problem, size of this doesn't matter.
-        computeDeviatoricStressVector(sig, epspvol, gp, strain, pressure, tStep);
-        computeDeviatoricStressVector(sigh, epspvol, gp, strain, pressure + h, tStep);
-
-        FloatArray dsigh;
-        dsigh.beDifferenceOf(sigh, sig);
-        dsigh.times(1 / h);
-
-        printf("Analytical deviatoric pressure tangent = ");
-        dsdp.printYourself();
-        printf("Numerical deviatoric pressure tangent = ");
-        dsigh.printYourself();
-        dsigh.subtract(dsdp);
-        double norm = dsigh.computeNorm();
-        if ( norm > dsdp.computeNorm() * DEBUG_ERR && norm > 0.0 ) {
-            OOFEM_ERROR("Error in deviatoric pressure tangent");
-        }
-#endif
-#if 0
-        // Numerical ATS for debugging
-        FloatArray tempStrain(3);
-        tempStrain.zero();
-        FloatArray sig, strain;
-        double epspvol, epspvol11, epspvol22, epspvol12, pressure = 0.0;
-        double h = 1.0; // Linear problem, size of this doesn't matter.
-
-        computeDeviatoricStressVector(sig, epspvol, gp, tempStrain, pressure, tStep);
-        strain = tempStrain;
-        strain.at(1) += h;
-        computeDeviatoricStressVector(sig, epspvol11, gp, strain, pressure, tStep);
-        strain = tempStrain;
-        strain.at(2) += h;
-        computeDeviatoricStressVector(sig, epspvol22, gp, strain, pressure, tStep);
-        strain = tempStrain;
-        strain.at(3) += h;
-        computeDeviatoricStressVector(sig, epspvol12, gp, strain, pressure, tStep);
-
-        FloatArray dvol(3);
-        dvol.at(1) = ( epspvol11 - epspvol ) / h;
-        dvol.at(2) = ( epspvol22 - epspvol ) / h;
-        dvol.at(3) = ( epspvol12 - epspvol ) / h;
-        dvol.at(1) += 1.0;
-        dvol.at(2) += 1.0;
-
-        printf("Analytical volumetric deviatoric tangent = ");
-        dedd.printYourself();
-        printf("Numerical volumetric deviatoric tangent = ");
-        dvol.printYourself();
-        dvol.subtract(dedd);
-        double norm = dvol.computeNorm();
-        if ( norm > dedd.computeNorm() * DEBUG_ERR && norm > 0.0 ) {
-            OOFEM_ERROR("Error in volumetric deviatoric tangent");
-        }
-#endif
-#if 0
-        // Numerical ATS for debugging
-        FloatArray strain(3);
-        strain.zero();
-        FloatArray sig;
-        double epspvol, epspvolh, pressure = 0.0;
-        double h = 1.0; // Linear problem, size of this doesn't matter.
-
-        computeDeviatoricStressVector(sig, epspvol, gp, strain, pressure, tStep);
-        computeDeviatoricStressVector(sig, epspvolh, gp, strain, pressure + h, tStep);
-
-        double dvol = -( epspvolh - epspvol ) / h;
-
-        printf("Analytical volumetric pressure tangent = %e\n", dedp);
-        printf("Numerical volumetric pressure tangent = %e\n", dvol);
-
-        double norm = fabs(dvol - dedp);
-        if ( norm > fabs(dedp) * DEBUG_ERR && norm > 0.0 ) {
-            OOFEM_ERROR("Error in volumetric pressure tangent");
-        }
-#endif
-    } else {
+    if ( mode != TangentStiffness ) {
         OOFEM_ERROR("Mode not implemented");
     }
+#if 0
+    // Numerical ATS for debugging
+    FloatMatrix numericalATS(6, 6);
+    FloatArray dsig;
+    FloatArray tempStrain(6);
+
+    tempStrain.zero();
+    FloatArray sig, strain, sigPert;
+    double epspvol;
+    computeDeviatoricStressVector(sig, epspvol, gp, tempStrain, 0., tStep);
+    double h = 0.001; // Linear problem, size of this doesn't matter.
+    for ( int k = 1; k <= 6; ++k ) {
+        strain = tempStrain;
+        strain.at(k) += h;
+        double tmp = strain.at(1) + strain.at(2) + strain.at(3);
+        strain.at(1) -= tmp/3.0;
+        strain.at(2) -= tmp/3.0;
+        strain.at(3) -= tmp/3.0;
+        strain.printYourself();
+        computeDeviatoricStressVector(sigPert, epspvol, gp, strain, 0., tStep);
+        sigPert.printYourself();
+        dsig.beDifferenceOf(sigPert, sig);
+        numericalATS.setColumn(dsig, k);
+    }
+    numericalATS.times(1. / h);
+
+    printf("Analytical deviatoric tangent = ");
+    dsdd.printYourself();
+    printf("Numerical deviatoric tangent = ");
+    numericalATS.printYourself();
+    numericalATS.subtract(dsdd);
+    double norm = numericalATS.computeFrobeniusNorm();
+    if ( norm > dsdd.computeFrobeniusNorm() * DEBUG_ERR && norm > 0.0 ) {
+        OOFEM_ERROR("Error in deviatoric tangent");
+    }
+#endif
+#if 0
+    // Numerical ATS for debugging
+    FloatArray strain(3);
+    strain.zero();
+    FloatArray sig, sigh;
+    double epspvol, pressure = 0.0;
+    double h = 1.00; // Linear problem, size of this doesn't matter.
+    computeDeviatoricStressVector(sig, epspvol, gp, strain, pressure, tStep);
+    computeDeviatoricStressVector(sigh, epspvol, gp, strain, pressure + h, tStep);
+
+    FloatArray dsigh;
+    dsigh.beDifferenceOf(sigh, sig);
+    dsigh.times(1 / h);
+
+    printf("Analytical deviatoric pressure tangent = ");
+    dsdp.printYourself();
+    printf("Numerical deviatoric pressure tangent = ");
+    dsigh.printYourself();
+    dsigh.subtract(dsdp);
+    double norm = dsigh.computeNorm();
+    if ( norm > dsdp.computeNorm() * DEBUG_ERR && norm > 0.0 ) {
+        OOFEM_ERROR("Error in deviatoric pressure tangent");
+    }
+#endif
+#if 0
+    // Numerical ATS for debugging
+    FloatArray tempStrain(3);
+    tempStrain.zero();
+    FloatArray sig, strain;
+    double epspvol, epspvol11, epspvol22, epspvol12, pressure = 0.0;
+    double h = 1.0; // Linear problem, size of this doesn't matter.
+
+    computeDeviatoricStressVector(sig, epspvol, gp, tempStrain, pressure, tStep);
+    strain = tempStrain;
+    strain.at(1) += h;
+    computeDeviatoricStressVector(sig, epspvol11, gp, strain, pressure, tStep);
+    strain = tempStrain;
+    strain.at(2) += h;
+    computeDeviatoricStressVector(sig, epspvol22, gp, strain, pressure, tStep);
+    strain = tempStrain;
+    strain.at(3) += h;
+    computeDeviatoricStressVector(sig, epspvol12, gp, strain, pressure, tStep);
+
+    FloatArray dvol(3);
+    dvol.at(1) = ( epspvol11 - epspvol ) / h;
+    dvol.at(2) = ( epspvol22 - epspvol ) / h;
+    dvol.at(3) = ( epspvol12 - epspvol ) / h;
+    dvol.at(1) += 1.0;
+    dvol.at(2) += 1.0;
+
+    printf("Analytical volumetric deviatoric tangent = ");
+    dedd.printYourself();
+    printf("Numerical volumetric deviatoric tangent = ");
+    dvol.printYourself();
+    dvol.subtract(dedd);
+    double norm = dvol.computeNorm();
+    if ( norm > dedd.computeNorm() * DEBUG_ERR && norm > 0.0 ) {
+        OOFEM_ERROR("Error in volumetric deviatoric tangent");
+    }
+#endif
+#if 0
+    // Numerical ATS for debugging
+    FloatArray strain(3);
+    strain.zero();
+    FloatArray sig;
+    double epspvol, epspvolh, pressure = 0.0;
+    double h = 1.0; // Linear problem, size of this doesn't matter.
+
+    computeDeviatoricStressVector(sig, epspvol, gp, strain, pressure, tStep);
+    computeDeviatoricStressVector(sig, epspvolh, gp, strain, pressure + h, tStep);
+
+    double dvol = -( epspvolh - epspvol ) / h;
+
+    printf("Analytical volumetric pressure tangent = %e\n", dedp);
+    printf("Numerical volumetric pressure tangent = %e\n", dvol);
+
+    double norm = fabs(dvol - dedp);
+    if ( norm > fabs(dedp) * DEBUG_ERR && norm > 0.0 ) {
+        OOFEM_ERROR("Error in volumetric pressure tangent");
+    }
+#endif
+    return {
+        ms->giveDeviatoricTangent(),
+        ms->giveDeviatoricPressureTangent(),
+        ms->giveVolumetricDeviatoricTangent(),
+        ms->giveVolumetricPressureTangent(),
+    };
 }
 
-IRResultType FE2FluidMaterial :: initializeFrom(InputRecord *ir)
+void FE2FluidMaterial :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;
+    FluidDynamicMaterial :: initializeFrom(ir);
     IR_GIVE_FIELD(ir, this->inputfile, _IFT_FE2FluidMaterial_fileName);
-    return FluidDynamicMaterial :: initializeFrom(ir);
 }
 
 void FE2FluidMaterial :: giveInputRecord(DynamicInputRecord &input)
@@ -296,7 +299,11 @@ int FE2FluidMaterial :: giveIPValue(FloatArray &answer, GaussPoint *gp, Internal
 
 MaterialStatus *FE2FluidMaterial :: CreateStatus(GaussPoint *gp) const
 {
-    return new FE2FluidMaterialStatus(n++, this->giveDomain(), gp, this->inputfile);
+    int rank = -1;
+    if ( this->domain->giveEngngModel()->isParallel() && this->domain->giveEngngModel()->giveNumberOfProcesses() > 1 ) {
+        rank = this->domain->giveEngngModel()->giveRank();
+    }
+    return new FE2FluidMaterialStatus(n++, rank, gp, this->inputfile);
 }
 
 int FE2FluidMaterial :: checkConsistency()
@@ -304,18 +311,18 @@ int FE2FluidMaterial :: checkConsistency()
     return true;
 }
 
-FE2FluidMaterialStatus :: FE2FluidMaterialStatus(int n, Domain *d, GaussPoint *gp, const std :: string &inputfile) :
-    FluidDynamicMaterialStatus(n, d, gp),
+FE2FluidMaterialStatus :: FE2FluidMaterialStatus(int n, int rank, GaussPoint *gp, const std :: string &inputfile) :
+    FluidDynamicMaterialStatus(gp),
     voffraction(0.0),
     oldTangents(true)
 {
-    if ( !this->createRVE(n, gp, inputfile) ) {
+    if ( !this->createRVE(n, rank ,gp, inputfile) ) {
         OOFEM_ERROR("Couldn't create RVE");
     }
 }
 
 // Uses an input file for now, should eventually create the RVE itself.
-bool FE2FluidMaterialStatus :: createRVE(int n, GaussPoint *gp, const std :: string &inputfile)
+bool FE2FluidMaterialStatus :: createRVE(int n, int rank, GaussPoint *gp, const std :: string &inputfile)
 {
     OOFEMTXTDataReader dr( inputfile.c_str() );
     this->rve = InstanciateProblem(dr, _processor, 0); // Everything but nrsolver is updated.
@@ -328,8 +335,8 @@ bool FE2FluidMaterialStatus :: createRVE(int n, GaussPoint *gp, const std :: str
 
     std :: ostringstream name;
     name << this->rve->giveOutputBaseFileName() << "-gp" << n;
-    if ( this->domain->giveEngngModel()->isParallel() && this->domain->giveEngngModel()->giveNumberOfProcesses() > 1 ) {
-        name << "." << this->domain->giveEngngModel()->giveRank();
+    if ( rank >= 0 ) {
+        name << "." << rank;
     }
 
     this->rve->letOutputBaseFileNameBe( name.str() );
@@ -342,7 +349,7 @@ bool FE2FluidMaterialStatus :: createRVE(int n, GaussPoint *gp, const std :: str
     return true;
 }
 
-void FE2FluidMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep)
+void FE2FluidMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep) const
 {
     FluidDynamicMaterialStatus :: printOutputAt(file, tStep);
 }
@@ -395,11 +402,11 @@ void FE2FluidMaterialStatus :: computeTangents(TimeStep *tStep)
     this->oldTangents = false;
 }
 
-double FE2FluidMaterial :: giveEffectiveViscosity(GaussPoint *gp, TimeStep *tStep)
+double FE2FluidMaterial :: giveEffectiveViscosity(GaussPoint *gp, TimeStep *tStep) const
 {
     FE2FluidMaterialStatus *status = static_cast< FE2FluidMaterialStatus * >( this->giveStatus(gp) );
     status->computeTangents(tStep);
-    const FloatMatrix &t = status->giveDeviatoricTangent();
+    const auto &t = status->giveDeviatoricTangent();
     // Project against the normalized I_dev
     double v;
     if ( gp->giveMaterialMode() == _3dFlow ) {

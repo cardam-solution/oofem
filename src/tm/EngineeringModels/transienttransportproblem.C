@@ -54,18 +54,10 @@
 namespace oofem {
 REGISTER_EngngModel(TransientTransportProblem);
 
-TransientTransportProblem :: TransientTransportProblem(int i, EngngModel *master) : EngngModel(i, master),
-    alpha(0.5),
-    dtFunction(0),
-    prescribedTimes(),
-    deltaT(1.),
-    keepTangent(false),
-    lumped(false)
+TransientTransportProblem :: TransientTransportProblem(int i, EngngModel *master) : EngngModel(i, master)
 {
     ndomains = 1;
 }
-
-TransientTransportProblem :: ~TransientTransportProblem() {}
 
 
 NumericalMethod *TransientTransportProblem :: giveNumericalMethod(MetaStep *mStep)
@@ -77,10 +69,10 @@ NumericalMethod *TransientTransportProblem :: giveNumericalMethod(MetaStep *mSte
 }
 
 
-IRResultType
-TransientTransportProblem :: initializeFrom(InputRecord *ir)
+void
+TransientTransportProblem :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;                // Required by IR_GIVE_FIELD macro
+    EngngModel :: initializeFrom(ir);
 
     int val = SMT_Skyline;
     IR_GIVE_OPTIONAL_FIELD(ir, val, _IFT_EngngModel_smtype);
@@ -88,19 +80,23 @@ TransientTransportProblem :: initializeFrom(InputRecord *ir)
 
     IR_GIVE_FIELD(ir, this->alpha, _IFT_TransientTransportProblem_alpha);
 
+    if ( ir.hasField(_IFT_TransientTransportProblem_initt) ) {
+        IR_GIVE_FIELD(ir, initT, _IFT_TransientTransportProblem_initt);
+    }
+    
     prescribedTimes.clear();
     dtFunction = 0;
-    if ( ir->hasField(_IFT_TransientTransportProblem_dtFunction) ) {
+    if ( ir.hasField(_IFT_TransientTransportProblem_dtFunction) ) {
         IR_GIVE_FIELD(ir, this->dtFunction, _IFT_TransientTransportProblem_dtFunction);
-    } else if ( ir->hasField(_IFT_TransientTransportProblem_prescribedTimes) ) {
+    } else if ( ir.hasField(_IFT_TransientTransportProblem_prescribedTimes) ) {
         IR_GIVE_FIELD(ir, this->prescribedTimes, _IFT_TransientTransportProblem_prescribedTimes);
     } else {
         IR_GIVE_FIELD(ir, this->deltaT, _IFT_TransientTransportProblem_deltaT);
     }
 
-    this->keepTangent = ir->hasField(_IFT_TransientTransportProblem_keepTangent);
+    this->keepTangent = ir.hasField(_IFT_TransientTransportProblem_keepTangent);
 
-    this->lumped = ir->hasField(_IFT_TransientTransportProblem_lumped);
+    this->lumped = ir.hasField(_IFT_TransientTransportProblem_lumped);
 
     field = std::make_unique<DofDistributedPrimaryField>(this, 1, FT_TransportProblemUnknowns, 2, this->alpha);
 
@@ -121,9 +117,6 @@ TransientTransportProblem :: initializeFrom(InputRecord *ir)
     }
     
 //     InternalVariableField(IST_HydrationDegree, FT_Unknown, MMA_ClosestPoint, this->giveDomain(1));
-    
-
-    return EngngModel :: initializeFrom(ir);
 }
 
 
@@ -151,7 +144,7 @@ TransientTransportProblem :: giveDiscreteTime(int iStep)
     if ( iStep > 0 && iStep <= this->prescribedTimes.giveSize() ) {
         return ( this->prescribedTimes.at(iStep) );
     } else if ( iStep == 0 ) {
-        return 0.0;
+        return initT;
     }
 
     OOFEM_ERROR("invalid iStep");
@@ -181,7 +174,7 @@ TimeStep *TransientTransportProblem :: giveSolutionStepWhenIcApply(bool force)
     } else {
         if ( !stepWhenIcApply ) {
             double dt = this->giveDeltaT(1);
-            stepWhenIcApply = std::make_unique<TimeStep>(giveNumberOfTimeStepWhenIcApply(), this, 0, 0., dt, 0);
+            stepWhenIcApply = std::make_unique<TimeStep>(giveNumberOfTimeStepWhenIcApply(), this, 0, this->initT, dt, 0);
             // The initial step goes from [-dt, 0], so the intrinsic time is at: -deltaT  + alpha*dt
             stepWhenIcApply->setIntrinsicTime(-dt + alpha * dt);
         }
@@ -193,7 +186,7 @@ TimeStep *TransientTransportProblem :: giveSolutionStepWhenIcApply(bool force)
 
 void TransientTransportProblem :: solveYourselfAt(TimeStep *tStep)
 {
-    OOFEM_LOG_INFO( "Solving [step number %5d, time %e]\n", tStep->giveNumber(), tStep->giveTargetTime() );
+    OOFEM_LOG_INFO( "\nSolving [step number %5d, time %e]\n", tStep->giveNumber(), tStep->giveTargetTime() );
     
     Domain *d = this->giveDomain(1);
     int neq = this->giveNumberOfDomainEquations( 1, EModelDefaultEquationNumbering() );

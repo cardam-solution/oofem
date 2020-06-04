@@ -69,20 +69,19 @@ protected:
 
 
 public:
-    FRCFCMNLStatus(int n, Domain *d, GaussPoint *g);
-    virtual ~FRCFCMNLStatus();
+    FRCFCMNLStatus(GaussPoint *g);
 
     /// LOCAL FIBER STRESSES (from crack opening)
-    double giveFiberStressLoc(int icrack) { return fiberStressLoc.at(icrack); }
-    double giveTempFiberStressLoc(int icrack) { return tempFiberStressLoc.at(icrack); }
+    double giveFiberStressLoc(int icrack) const { return fiberStressLoc.at(icrack); }
+    double giveTempFiberStressLoc(int icrack) const { return tempFiberStressLoc.at(icrack); }
     void setTempFiberStressLoc(int icrack, double newFiberStressLoc) { tempFiberStressLoc.at(icrack) = newFiberStressLoc; }
 
     /// NON-LOCAL FIBER STRESSES (from surrounding cracks)
-    double giveFiberStressNL(int icrack) { return fiberStressNL.at(icrack); }
-    double giveTempFiberStressNL(int icrack) { return tempFiberStressNL.at(icrack); }
+    double giveFiberStressNL(int icrack) const { return fiberStressNL.at(icrack); }
+    double giveTempFiberStressNL(int icrack) const { return tempFiberStressNL.at(icrack); }
     void setTempFiberStressNL(int icrack, double newFiberStressNL) { tempFiberStressNL.at(icrack) = newFiberStressNL; }
 
-    void printOutputAt(FILE *file, TimeStep *tStep) override;
+    void printOutputAt(FILE *file, TimeStep *tStep) const override;
 
     const char *giveClassName() const override { return "FRCFCMNLStatus"; }
 
@@ -101,12 +100,11 @@ class FRCFCMNL : public FRCFCM, public StructuralNonlocalMaterialExtensionInterf
 {
 public:
     FRCFCMNL(int n, Domain *d);
-    virtual ~FRCFCMNL() {}
 
     const char *giveClassName() const override { return "FRCFCMNL"; }
     const char *giveInputRecordName() const override { return _IFT_FRCFCMNL_Name; }
 
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
 
     void giveRealStressVector(FloatArray &answer, GaussPoint *gp,
                               const FloatArray &reducedStrain, TimeStep *tStep) override;
@@ -117,12 +115,12 @@ public:
 
     Interface *giveInterface(InterfaceType it) override;
 
-    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new FRCFCMNLStatus(1, FRCFCM :: domain, gp); }
+    MaterialStatus *CreateStatus(GaussPoint *gp) const override { return new FRCFCMNLStatus(gp); }
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
 
     //nothing to update here, is it?
-    void updateBeforeNonlocAverage(const FloatArray &strainVector, GaussPoint *gp, TimeStep *tStep) override { }
+    void updateBeforeNonlocAverage(const FloatArray &strainVector, GaussPoint *gp, TimeStep *tStep) const override { }
 
     bool isStrengthExceeded(const FloatMatrix &base, GaussPoint *gp, TimeStep *tStep, int iCrack, double trialStress) override;
 
@@ -148,7 +146,7 @@ public:
 
 protected:
     /// participation angle. The target gauss point must fall into this angle to contribute to the nonlocal stress
-    double participAngle;
+    double participAngle = 0.;
 };
 } // end namespace oofem
 #endif // frcfcmnl_h

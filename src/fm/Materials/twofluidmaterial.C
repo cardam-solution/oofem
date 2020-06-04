@@ -40,6 +40,7 @@
 #include "materialinterface.h"
 #include "dynamicinputrecord.h"
 #include "classfactory.h"
+#include "gausspoint.h"
 
 namespace oofem {
 REGISTER_Material(TwoFluidMaterial);
@@ -52,18 +53,13 @@ TwoFluidMaterial :: checkConsistency()
 }
 
 
-IRResultType
-TwoFluidMaterial :: initializeFrom(InputRecord *ir)
+void
+TwoFluidMaterial :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;                // Required by IR_GIVE_FIELD macro
-
     IR_GIVE_FIELD(ir, this->slaveMaterial, _IFT_TwoFluidMaterial_mat);
     if ( this->slaveMaterial.giveSize() != 2 ) {
-        OOFEM_WARNING("mat array should have two values");
-        return IRRT_BAD_FORMAT;
+        throw ValueInputException(ir, _IFT_TwoFluidMaterial_mat, "mat array should have two values");
     }
-
-    return IRRT_OK;
 }
 
 
@@ -76,7 +72,7 @@ TwoFluidMaterial :: giveInputRecord(DynamicInputRecord &input)
 
 
 double
-TwoFluidMaterial :: giveEffectiveViscosity(GaussPoint *gp, TimeStep *tStep)
+TwoFluidMaterial :: giveEffectiveViscosity(GaussPoint *gp, TimeStep *tStep) const
 {
     TwoFluidMaterialStatus *status = static_cast< TwoFluidMaterialStatus * >( this->giveStatus(gp) );
     double vof = this->giveTempVOF(gp);
@@ -86,7 +82,7 @@ TwoFluidMaterial :: giveEffectiveViscosity(GaussPoint *gp, TimeStep *tStep)
 
 
 double
-TwoFluidMaterial :: give(int aProperty, GaussPoint *gp)
+TwoFluidMaterial :: give(int aProperty, GaussPoint *gp) const
 {
     TwoFluidMaterialStatus *status = static_cast< TwoFluidMaterialStatus * >( this->giveStatus(gp) );
     double vof = this->giveTempVOF(gp);
@@ -111,7 +107,7 @@ TwoFluidMaterial :: giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStat
 MaterialStatus *
 TwoFluidMaterial :: CreateStatus(GaussPoint *gp) const
 {
-    return new TwoFluidMaterialStatus(1, this->giveDomain(), gp, this->slaveMaterial);
+    return new TwoFluidMaterialStatus(gp, {this->giveMaterial(0), this->giveMaterial(1)});
 }
 
 FluidDynamicMaterial *
@@ -120,41 +116,37 @@ TwoFluidMaterial :: giveMaterial(int i) const
     return static_cast< FluidDynamicMaterial * >( domain->giveMaterial( slaveMaterial[i] ) );
 }
 
-void
-TwoFluidMaterial :: computeDeviatoricStress3D(FloatArray &answer, GaussPoint *gp, const FloatArray &eps, TimeStep *tStep)
+FloatArrayF<6>
+TwoFluidMaterial :: computeDeviatoricStress3D(const FloatArrayF<6> &eps, GaussPoint *gp, TimeStep *tStep) const
 {
     double vof = this->giveTempVOF(gp);
-    FloatArray v0, v1;
     TwoFluidMaterialStatus *status = static_cast< TwoFluidMaterialStatus * >( this->giveStatus(gp) );
 
-    this->giveMaterial(0)->computeDeviatoricStress3D(v0, status->giveSlaveGaussPoint0(), eps, tStep);
-    this->giveMaterial(1)->computeDeviatoricStress3D(v1, status->giveSlaveGaussPoint1(), eps, tStep);
+    auto v0 = this->giveMaterial(0)->computeDeviatoricStress3D(eps, status->giveSlaveGaussPoint0(), tStep);
+    auto v1 = this->giveMaterial(1)->computeDeviatoricStress3D(eps, status->giveSlaveGaussPoint1(), tStep);
 
-    answer.clear();
-    answer.add(1.0 - vof, v0);
-    answer.add(vof, v1);
+    auto stress = (1.0 - vof) * v0 + vof * v1;
 
     status->letDeviatoricStrainRateVectorBe(eps);
-    status->letDeviatoricStressVectorBe(answer);
+    status->letDeviatoricStressVectorBe(stress);
+
+    return stress;
 }
 
-void
-TwoFluidMaterial :: computeTangent3D(FloatMatrix &answer, MatResponseMode mode, GaussPoint *gp, TimeStep *tStep)
+FloatMatrixF<6,6>
+TwoFluidMaterial :: computeTangent3D(MatResponseMode mode, GaussPoint *gp, TimeStep *tStep) const
 {
-    FloatMatrix a0, a1;
     double vof = this->giveTempVOF(gp);
     TwoFluidMaterialStatus *status = static_cast< TwoFluidMaterialStatus * >( this->giveStatus(gp) );
 
-    this->giveMaterial(0)->computeTangent3D(a0, mode, status->giveSlaveGaussPoint0(), tStep);
-    this->giveMaterial(1)->computeTangent3D(a1, mode, status->giveSlaveGaussPoint1(), tStep);
+    auto a0 = this->giveMaterial(0)->computeTangent3D(mode, status->giveSlaveGaussPoint0(), tStep);
+    auto a1 = this->giveMaterial(1)->computeTangent3D(mode, status->giveSlaveGaussPoint1(), tStep);
 
-    answer.clear();
-    answer.add(1.0 - vof, a0);
-    answer.add(vof, a1);
+    return (1.0 - vof) * a0 + vof * a1;
 }
 
 double
-TwoFluidMaterial :: giveTempVOF(GaussPoint *gp)
+TwoFluidMaterial :: giveTempVOF(GaussPoint *gp) const
 {
     FloatArray vof(2);
     MaterialInterface *mi = domain->giveEngngModel()->giveMaterialInterface( domain->giveNumber() );
@@ -174,21 +166,18 @@ TwoFluidMaterial :: giveTempVOF(GaussPoint *gp)
 
 
 
-TwoFluidMaterialStatus :: TwoFluidMaterialStatus(int n, Domain *d, GaussPoint *gp, const IntArray &slaveMaterial) :
-    FluidDynamicMaterialStatus(n, d, gp),
-    slaveGp0( std::make_unique<GaussPoint>(nullptr, 0, FloatArray(), 0., gp->giveMaterialMode()) ),
-    slaveGp1( std::make_unique<GaussPoint>(nullptr, 0, FloatArray(), 0., gp->giveMaterialMode()) )
+TwoFluidMaterialStatus :: TwoFluidMaterialStatus(GaussPoint *gp, const std::array<Material*, 2> &slaveMaterial) :
+    FluidDynamicMaterialStatus(gp),
+    slaveGps{{{nullptr, 0, 0., gp->giveMaterialMode()}, {nullptr, 0, 0., gp->giveMaterialMode()}}}
 {
-    this->slaveGp0->setMaterialStatus( domain->giveMaterial( slaveMaterial[0] )->CreateStatus(this->slaveGp0.get()), this->giveNumber() );
-    this->slaveGp1->setMaterialStatus( domain->giveMaterial( slaveMaterial[1] )->CreateStatus(this->slaveGp0.get()), this->giveNumber() );
+    for ( int i = 0; i < 2; ++i ) slaveGps[i].setMaterialStatus( slaveMaterial[i]->CreateStatus( &slaveGps[i] ) );
 }
 
 
 void
-TwoFluidMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep)
+TwoFluidMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep) const
 {
-    this->giveSlaveGaussPoint0()->giveMaterialStatus()->printOutputAt(file, tStep);
-    this->giveSlaveGaussPoint1()->giveMaterialStatus()->printOutputAt(file, tStep);
+    for ( auto &gp : slaveGps ) gp.giveMaterialStatus()->printOutputAt(file, tStep);
 }
 
 
@@ -196,8 +185,7 @@ void
 TwoFluidMaterialStatus :: updateYourself(TimeStep *tStep)
 {
     FluidDynamicMaterialStatus :: updateYourself(tStep);
-    this->giveSlaveGaussPoint0()->giveMaterialStatus()->updateYourself(tStep);
-    this->giveSlaveGaussPoint1()->giveMaterialStatus()->updateYourself(tStep);
+    for ( auto &gp : slaveGps ) gp.giveMaterialStatus()->updateYourself(tStep);
 }
 
 
@@ -205,23 +193,20 @@ void
 TwoFluidMaterialStatus :: initTempStatus()
 {
     FluidDynamicMaterialStatus :: initTempStatus();
-    static_cast< MaterialStatus * >( this->giveSlaveGaussPoint0()->giveMaterialStatus() )->initTempStatus();
-    static_cast< MaterialStatus * >( this->giveSlaveGaussPoint1()->giveMaterialStatus() )->initTempStatus();
+    for ( auto &gp : slaveGps ) static_cast< MaterialStatus * >( gp.giveMaterialStatus() )->initTempStatus();
 }
 
 
 void
 TwoFluidMaterialStatus :: saveContext(DataStream &stream, ContextMode mode)
 {
-    this->giveSlaveGaussPoint0()->giveMaterialStatus()->saveContext(stream, mode);
-    this->giveSlaveGaussPoint1()->giveMaterialStatus()->saveContext(stream, mode);
+    for ( auto &gp : slaveGps ) gp.giveMaterialStatus()->saveContext(stream, mode);
 }
 
 
 void
 TwoFluidMaterialStatus :: restoreContext(DataStream &stream, ContextMode mode)
 {
-    this->giveSlaveGaussPoint0()->giveMaterialStatus()->restoreContext(stream, mode);
-    this->giveSlaveGaussPoint1()->giveMaterialStatus()->restoreContext(stream, mode);
+    for ( auto &gp : slaveGps ) gp.giveMaterialStatus()->restoreContext(stream, mode);
 }
 } // end namespace oofem

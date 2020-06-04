@@ -47,6 +47,7 @@
 #define _IFT_TransientTransportProblem_Name "transienttransport"
 #define _IFT_TransientTransportProblem_alpha "alpha" ///< Defines the time discretization of the value: @f$ u = u_n (1-\alpha) + u_{n+1} \alpha @f$.
 #define _IFT_TransientTransportProblem_deltaT "deltat" ///< Fixed timestep.
+#define _IFT_TransientTransportProblem_initt "initt" ///< Initial time
 #define _IFT_TransientTransportProblem_dtFunction "dtfunction" ///< Function that determines size of time step.
 #define _IFT_TransientTransportProblem_prescribedTimes "prescribedtimes" ///< Discrete times for each time step.
 #define _IFT_TransientTransportProblem_keepTangent "keeptangent" ///< Fixes the tangent to be reused on each step.
@@ -65,7 +66,7 @@ class Function;
 class TransientTransportProblem : public EngngModel
 {
 protected:
-    SparseMtrxType sparseMtrxType;
+    SparseMtrxType sparseMtrxType = SMT_Skyline;
     std :: unique_ptr< DofDistributedPrimaryField > field;
 
     std :: unique_ptr< SparseMtrx > effectiveMatrix;
@@ -77,20 +78,19 @@ protected:
     /// Numerical method used to solve the problem
     std :: unique_ptr< SparseNonLinearSystemNM > nMethod;
 
-    double alpha;
-    int dtFunction;
+    double alpha = 0.5;
+    int dtFunction = 0;
     FloatArray prescribedTimes;
-    double deltaT;
-    bool keepTangent, hasTangent;
-    bool lumped;
+    /// Initial time from which the computation runs. Default is zero.
+    double initT = 0.;
+    double deltaT = 1.;
+    bool keepTangent = false, hasTangent = false;
+    bool lumped = false;
 
     IntArray exportFields;
 
 public:
-    /// Constructor.
     TransientTransportProblem(int i, EngngModel *master=nullptr);
-    /// Destructor.
-    virtual ~TransientTransportProblem();
 
     void solveYourselfAt(TimeStep *tStep) override;
     void updateComponent(TimeStep *tStep, NumericalCmpn cmpn, Domain *d) override;
@@ -116,7 +116,7 @@ public:
     TimeStep *giveSolutionStepWhenIcApply(bool force = false) override;
     NumericalMethod *giveNumericalMethod(MetaStep *mStep) override;
 
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
 
     bool requiresEquationRenumbering(TimeStep *tStep) override;
     int forceEquationNumbering() override;

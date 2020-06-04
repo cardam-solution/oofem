@@ -47,18 +47,18 @@ class FEI2dLineQuad;
  * with interior penalty formulation.
  * @author Erik Svenning
  */
-class IntElLine2IntPen : public IntElLine2 {
+class IntElLine2IntPen : public IntElLine2
+{
 public:
-	IntElLine2IntPen(int n, Domain * d);
-	virtual ~IntElLine2IntPen();
+    IntElLine2IntPen(int n, Domain * d);
 
     // definition & identification
     const char *giveInputRecordName() const override { return _IFT_IntElLine2IntPen_Name; }
     const char *giveClassName() const override { return "IntElLine2IntPen"; }
 
-    IRResultType initializeFrom(InputRecord *ir) override;
+    void initializeFrom(InputRecord &ir) override;
 
-    void computeCovarBaseVectorAt(GaussPoint *gp, FloatArray &G) override;
+    FloatArrayF<2> computeCovarBaseVectorAt(GaussPoint *gp) const override;
 
 
     /**

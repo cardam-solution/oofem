@@ -58,7 +58,7 @@ class OOFEM_EXPORT ModuleManager
 {
 protected:
     /// Module list.
-    std :: vector< std :: unique_ptr< M > > moduleList;
+    std::vector< std::unique_ptr< M > > moduleList;
     /// Number of modules.
     int numberOfModules;
     /// Associated Engineering model.
@@ -91,20 +91,15 @@ public:
      * @param ir Record for receiver.
      * @return Nonzero if o.k.
      */
-    virtual int instanciateYourself(DataReader &dr, InputRecord *ir)
+    virtual int instanciateYourself(DataReader &dr, InputRecord &ir)
     {
-        IRResultType result;                   // Required by IR_GIVE_FIELD macro
-
         std :: string name;
 
         // read modules
         moduleList.reserve(numberOfModules);
         for ( int i = 0; i < numberOfModules; i++ ) {
-            InputRecord *mir = dr.giveInputRecord(DataReader :: IR_expModuleRec, i + 1);
-            result = mir->giveRecordKeywordField(name);
-            if ( result != IRRT_OK ) {
-                IR_IOERR("", mir, result);
-            }
+            auto &mir = dr.giveInputRecord(DataReader :: IR_expModuleRec, i + 1);
+            mir.giveRecordKeywordField(name);
 
             // read type of module
             std :: unique_ptr< M > module = this->CreateModule(name.c_str(), i, emodel);
@@ -113,7 +108,8 @@ public:
             }
 
             module->initializeFrom(mir);
-            moduleList.push_back(std :: move(module));
+            registerModule(module);
+//             moduleList.push_back(std :: move(module));
         }
 
 #  ifdef VERBOSE
@@ -123,10 +119,20 @@ public:
     }
 
     /**
+     * Stores a module in moduleList. Useful when 
+     * adding modules externally, e.g. from Python
+     */
+    
+    virtual void registerModule (std::unique_ptr< M > &module){
+        moduleList.push_back(std::move(module));
+    }
+    
+    
+    /**
      * Instanciates the receiver from input record. Called from instanciateYourself to initialize yourself
      * from corresponding record. Should be called before instanciateYourself.
      */
-    virtual IRResultType initializeFrom(InputRecord *ir) = 0;
+    virtual void initializeFrom(InputRecord &ir) = 0;
     /// Returns class name of the receiver.
     virtual const char *giveClassName() const = 0;
 

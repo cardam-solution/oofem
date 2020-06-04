@@ -48,18 +48,12 @@ namespace oofem {
 REGISTER_Material(RCSDMaterial);
 
 RCSDMaterial :: RCSDMaterial(int n, Domain *d) : RCM2Material(n, d)
-    //
-    // constructor
-    //
 {
     linearElasticMaterial = new IsotropicLinearElasticMaterial(n, d);
 }
 
 
 RCSDMaterial :: ~RCSDMaterial()
-//
-// destructor
-//
 {
     delete linearElasticMaterial;
 }
@@ -105,7 +99,7 @@ RCSDMaterial :: giveRealStressVector(FloatArray &answer, GaussPoint *gp,
         this->giveRealPrincipalStressVector3d(princStress, gp, principalStrain, tempCrackDirs, tStep);
         princStress.resize(6);
         tempCrackDirs = status->giveTempCrackDirs();
-        this->transformStressVectorTo(answer, tempCrackDirs, princStress, 1);
+        answer = this->transformStressVectorTo(tempCrackDirs, princStress, 1);
 
         StructuralMaterial :: giveReducedSymVectorForm( reducedSpaceStressVector, answer, gp->giveMaterialMode() );
         status->letTempStressVectorBe(reducedSpaceStressVector);
@@ -252,19 +246,16 @@ RCSDMaterial :: computeCurrEquivStrain(GaussPoint *gp, const FloatArray &reduced
 }
 
 
-IRResultType
-RCSDMaterial :: initializeFrom(InputRecord *ir)
+void
+RCSDMaterial :: initializeFrom(InputRecord &ir)
 {
-    IRResultType result;                // Required by IR_GIVE_FIELD macro
-
+    RCM2Material :: initializeFrom(ir);
     IR_GIVE_FIELD(ir, SDTransitionCoeff, _IFT_RCSDMaterial_sdtransitioncoeff);
-
-    return RCM2Material :: initializeFrom(ir);
 }
 
 
 double
-RCSDMaterial :: give(int aProperty, GaussPoint *gp)
+RCSDMaterial :: give(int aProperty, GaussPoint *gp) const
 // Returns the value of the property aProperty (e.g. the Young's modulus
 // 'E') of the receiver.
 {
@@ -470,24 +461,14 @@ RCSDMaterial :: giveNormalCrackingStress(GaussPoint *gp, double crackStrain, int
 
 
 
-RCSDMaterialStatus :: RCSDMaterialStatus(int n, Domain *d, GaussPoint *g) :
-    RCM2MaterialStatus(n, d, g), Ds0()
-{
-    maxEquivStrain = tempMaxEquivStrain = 0.0;
-    damageCoeff = tempDamageCoeff = 1.0;
-    damageStiffCoeff = depsf = depsp = 0.0;
-    mode = tempMode = rcMode;
-}
-
-
-RCSDMaterialStatus :: ~RCSDMaterialStatus()
-{ }
+RCSDMaterialStatus :: RCSDMaterialStatus(GaussPoint *g) :
+    RCM2MaterialStatus(g)
+{}
 
 
 void
-RCSDMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep)
+RCSDMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep) const
 {
-    int i;
     char s [ 11 ];
 
     StructuralMaterialStatus :: printOutputAt(file, tStep);
@@ -496,7 +477,7 @@ RCSDMaterialStatus :: printOutputAt(FILE *file, TimeStep *tStep)
         fprintf(file, "mode :rc ");
 
         if ( this->giveTempAlreadyCrack() ) {
-            for ( i = 1; i <= 3; i++ ) {
+            for ( int i = 1; i <= 3; i++ ) {
                 switch ( crackStatuses.at(i) ) {
                 case pscm_NONE:
                     strcpy(s, "NONE");
